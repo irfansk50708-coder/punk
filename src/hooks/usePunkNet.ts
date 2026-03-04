@@ -30,7 +30,7 @@ import { getRelayManager } from '@/lib/relay';
 import { getAllGroups } from '@/lib/db';
 import type { Identity, SignalMessage, Contact } from '@/lib/types';
 
-const BOOTSTRAP_URL = process.env.NEXT_PUBLIC_BOOTSTRAP_URL || 'wss://punk-bootstrap.fly.dev';
+const BOOTSTRAP_URL = process.env.NEXT_PUBLIC_BOOTSTRAP_URL || 'wss://yewschat.onrender.com/api/signal';
 
 export function usePunkNet() {
   const store = useAppStore();
