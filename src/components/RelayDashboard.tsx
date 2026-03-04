@@ -1,10 +1,20 @@
 // ============================================================
-// Relay Node Dashboard
+// Relay Node Dashboard – MUI + Lucide
 // ============================================================
 
 'use client';
 
 import { useState, useEffect } from 'react';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import IconButton from '@mui/material/IconButton';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Switch from '@mui/material/Switch';
+import Slider from '@mui/material/Slider';
+import LinearProgress from '@mui/material/LinearProgress';
+import Paper from '@mui/material/Paper';
 import {
   X,
   Radio,
@@ -14,11 +24,8 @@ import {
   ArrowUpDown,
   Clock,
   Star,
-  ToggleLeft,
-  ToggleRight,
   Gauge,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import type { RelayStats } from '@/lib/types';
 import { getRelayManager } from '@/lib/relay';
 
@@ -29,31 +36,24 @@ interface RelayDashboardProps {
   onClose: () => void;
 }
 
-export default function RelayDashboard({
-  isRelayEnabled,
-  relayStats,
-  onToggleRelay,
-  onClose,
-}: RelayDashboardProps) {
+export default function RelayDashboard({ isRelayEnabled, relayStats, onToggleRelay, onClose }: RelayDashboardProps) {
   const [bandwidthLimit, setBandwidthLimit] = useState(1024);
   const [liveStats, setLiveStats] = useState<RelayStats>(relayStats);
 
-  // Update stats periodically when relay is active
   useEffect(() => {
     if (!isRelayEnabled) return;
-
     const timer = setInterval(() => {
       const relay = getRelayManager();
       setLiveStats(relay.getStats());
     }, 1000);
-
     return () => clearInterval(timer);
   }, [isRelayEnabled]);
 
-  const handleBandwidthChange = (value: number) => {
-    setBandwidthLimit(value);
+  const handleBandwidthChange = (_: Event, value: number | number[]) => {
+    const v = value as number;
+    setBandwidthLimit(v);
     const relay = getRelayManager();
-    relay.setBandwidthLimit(value);
+    relay.setBandwidthLimit(v);
   };
 
   const formatBytes = (bytes: number) => {
@@ -72,155 +72,154 @@ export default function RelayDashboard({
 
   const stats = isRelayEnabled ? liveStats : relayStats;
 
+  const statCards = [
+    { icon: ArrowUpDown, color: '#3b82f6', value: stats.packetsForwarded, label: 'Packets Forwarded' },
+    { icon: Activity, color: '#a855f7', value: formatBytes(stats.bytesRelayed), label: 'Data Relayed' },
+    { icon: Zap, color: '#eab308', value: stats.activeCircuits, label: 'Active Circuits' },
+    { icon: Clock, color: '#9ca3af', value: formatUptime(stats.uptime), label: 'Uptime' },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-gray-900 rounded-2xl border border-gray-800 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-800">
-          <div className="flex items-center gap-2">
-            <Radio className={cn('w-5 h-5', isRelayEnabled ? 'text-emerald-400' : 'text-gray-500')} />
-            <h2 className="text-white font-semibold">Relay Node</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 text-gray-400 hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4, bgcolor: '#111827', border: '1px solid rgba(55,65,81,0.5)', maxHeight: '90vh' } }}>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Radio size={20} color={isRelayEnabled ? '#10b981' : '#6b7280'} />
+          <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem' }}>Relay Node</Typography>
+        </Box>
+        <IconButton onClick={onClose} size="small" sx={{ color: '#9ca3af' }}>
+          <X size={18} />
+        </IconButton>
+      </DialogTitle>
 
-        <div className="p-6 space-y-6">
-          {/* Toggle */}
-          <div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-xl">
-            <div>
-              <h3 className="text-white font-medium">Enable Relay</h3>
-              <p className="text-gray-500 text-xs mt-0.5">
-                Help others communicate privately by relaying encrypted packets
-              </p>
-            </div>
-            <button
-              onClick={() => onToggleRelay(!isRelayEnabled)}
-              className={cn(
-                'transition-colors',
-                isRelayEnabled ? 'text-emerald-400' : 'text-gray-600'
-              )}
+      <DialogContent sx={{ p: 3, pt: 0 }}>
+        {/* Toggle */}
+        <Paper
+          elevation={0}
+          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2, borderRadius: 3, bgcolor: 'rgba(31,41,55,0.2)', border: '1px solid rgba(55,65,81,0.2)', mb: 2.5 }}
+        >
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem' }}>Enable Relay</Typography>
+            <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>
+              Help others communicate privately by relaying encrypted packets
+            </Typography>
+          </Box>
+          <Switch
+            checked={isRelayEnabled}
+            onChange={(_, checked) => onToggleRelay(checked)}
+            sx={{
+              '& .MuiSwitch-switchBase.Mui-checked': { color: '#10b981' },
+              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#10b981' },
+            }}
+          />
+        </Paper>
+
+        {/* Status */}
+        <Paper
+          elevation={0}
+          sx={{
+            textAlign: 'center',
+            py: 2.5,
+            borderRadius: 3,
+            bgcolor: isRelayEnabled ? 'rgba(16,185,129,0.08)' : 'rgba(31,41,55,0.2)',
+            border: isRelayEnabled ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(55,65,81,0.2)',
+            mb: 2.5,
+          }}
+        >
+          <Radio
+            size={32}
+            color={isRelayEnabled ? '#10b981' : '#4b5563'}
+            style={isRelayEnabled ? { animation: 'pulse 2s infinite' } : undefined}
+          />
+          <Typography variant="body2" sx={{ fontWeight: 600, color: isRelayEnabled ? '#6ee7b7' : '#6b7280', mt: 1 }}>
+            {isRelayEnabled ? 'Relay Active' : 'Relay Inactive'}
+          </Typography>
+          <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>
+            {isRelayEnabled ? 'You are helping the network. Thank you!' : 'Enable to contribute to the network'}
+          </Typography>
+        </Paper>
+
+        {/* Stats Grid */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 2.5 }}>
+          {statCards.map((s) => (
+            <Paper
+              key={s.label}
+              elevation={0}
+              sx={{ p: 2, borderRadius: 3, bgcolor: 'rgba(31,41,55,0.2)', border: '1px solid rgba(55,65,81,0.2)' }}
             >
-              {isRelayEnabled ? (
-                <ToggleRight className="w-10 h-10" />
-              ) : (
-                <ToggleLeft className="w-10 h-10" />
-              )}
-            </button>
-          </div>
+              <s.icon size={16} color={s.color} />
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', mt: 0.5, fontSize: '1.1rem' }}>
+                {s.value}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.65rem' }}>
+                {s.label}
+              </Typography>
+            </Paper>
+          ))}
+        </Box>
 
-          {/* Status */}
-          <div
-            className={cn(
-              'text-center py-4 rounded-xl',
-              isRelayEnabled
-                ? 'bg-emerald-500/10 border border-emerald-500/20'
-                : 'bg-gray-800/30 border border-gray-800'
-            )}
-          >
-            <Radio
-              className={cn(
-                'w-8 h-8 mx-auto mb-2',
-                isRelayEnabled
-                  ? 'text-emerald-400 animate-pulse'
-                  : 'text-gray-600'
-              )}
-            />
-            <p className={cn('font-medium', isRelayEnabled ? 'text-emerald-300' : 'text-gray-500')}>
-              {isRelayEnabled ? 'Relay Active' : 'Relay Inactive'}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              {isRelayEnabled
-                ? 'You are helping the network. Thank you!'
-                : 'Enable to contribute to the network'}
-            </p>
-          </div>
+        {/* Reputation */}
+        <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: 'rgba(31,41,55,0.2)', border: '1px solid rgba(55,65,81,0.2)', mb: 2.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Star size={16} color="#eab308" />
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#fff', fontSize: '0.85rem' }}>Reputation Score</Typography>
+            </Box>
+            <Typography variant="body2" sx={{ fontWeight: 700, color: '#10b981' }}>{stats.reputationScore}/100</Typography>
+          </Box>
+          <LinearProgress
+            variant="determinate"
+            value={stats.reputationScore}
+            sx={{
+              height: 8,
+              borderRadius: 4,
+              bgcolor: '#1f2937',
+              '& .MuiLinearProgress-bar': { background: 'linear-gradient(90deg, #10b981, #14b8a6)', borderRadius: 4 },
+            }}
+          />
+        </Paper>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-4 bg-gray-800/30 rounded-xl">
-              <ArrowUpDown className="w-4 h-4 text-blue-400 mb-2" />
-              <p className="text-white text-lg font-semibold">{stats.packetsForwarded}</p>
-              <p className="text-gray-500 text-xs">Packets Forwarded</p>
-            </div>
-            <div className="p-4 bg-gray-800/30 rounded-xl">
-              <Activity className="w-4 h-4 text-purple-400 mb-2" />
-              <p className="text-white text-lg font-semibold">{formatBytes(stats.bytesRelayed)}</p>
-              <p className="text-gray-500 text-xs">Data Relayed</p>
-            </div>
-            <div className="p-4 bg-gray-800/30 rounded-xl">
-              <Zap className="w-4 h-4 text-yellow-400 mb-2" />
-              <p className="text-white text-lg font-semibold">{stats.activeCircuits}</p>
-              <p className="text-gray-500 text-xs">Active Circuits</p>
-            </div>
-            <div className="p-4 bg-gray-800/30 rounded-xl">
-              <Clock className="w-4 h-4 text-gray-400 mb-2" />
-              <p className="text-white text-lg font-semibold">{formatUptime(stats.uptime)}</p>
-              <p className="text-gray-500 text-xs">Uptime</p>
-            </div>
-          </div>
+        {/* Bandwidth Limit */}
+        <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: 'rgba(31,41,55,0.2)', border: '1px solid rgba(55,65,81,0.2)', mb: 2.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Gauge size={16} color="#f97316" />
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#fff', fontSize: '0.85rem' }}>Bandwidth Limit</Typography>
+            </Box>
+            <Typography variant="body2" sx={{ color: '#d1d5db', fontFamily: 'monospace', fontSize: '0.8rem' }}>{bandwidthLimit} KB/s</Typography>
+          </Box>
+          <Slider
+            value={bandwidthLimit}
+            onChange={handleBandwidthChange}
+            min={128}
+            max={10240}
+            step={128}
+            sx={{ color: '#10b981' }}
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography variant="caption" sx={{ color: '#4b5563', fontSize: '0.65rem' }}>128 KB/s</Typography>
+            <Typography variant="caption" sx={{ color: '#4b5563', fontSize: '0.65rem' }}>10 MB/s</Typography>
+          </Box>
+        </Paper>
 
-          {/* Reputation */}
-          <div className="p-4 bg-gray-800/30 rounded-xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Star className="w-4 h-4 text-yellow-400" />
-                <span className="text-white text-sm font-medium">Reputation Score</span>
-              </div>
-              <span className="text-emerald-400 font-semibold">{stats.reputationScore}/100</span>
-            </div>
-            <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all"
-                style={{ width: `${stats.reputationScore}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Bandwidth Limit */}
-          <div className="p-4 bg-gray-800/30 rounded-xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Gauge className="w-4 h-4 text-orange-400" />
-                <span className="text-white text-sm font-medium">Bandwidth Limit</span>
-              </div>
-              <span className="text-gray-300 text-sm font-mono">{bandwidthLimit} KB/s</span>
-            </div>
-            <input
-              type="range"
-              min="128"
-              max="10240"
-              step="128"
-              value={bandwidthLimit}
-              onChange={(e) => handleBandwidthChange(parseInt(e.target.value))}
-              className="w-full h-2 bg-gray-800 rounded-full appearance-none cursor-pointer accent-emerald-500"
-            />
-            <div className="flex justify-between text-xs text-gray-600 mt-1">
-              <span>128 KB/s</span>
-              <span>10 MB/s</span>
-            </div>
-          </div>
-
-          {/* Info */}
-          <div className="p-4 bg-gray-800/20 rounded-xl border border-gray-800">
-            <h4 className="text-gray-300 text-sm font-medium mb-2 flex items-center gap-2">
-              <Shield className="w-4 h-4 text-emerald-400" />
-              How Relay Nodes Work
-            </h4>
-            <ul className="space-y-1.5 text-gray-500 text-xs">
-              <li>• Relay nodes forward encrypted packets between peers</li>
-              <li>• You cannot read any of the relayed content (onion encryption)</li>
-              <li>• Higher reputation = trusted by more peers</li>
-              <li>• Bandwidth throttling prevents abuse</li>
-              <li>• Rate limiting protects against flooding attacks</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
+        {/* Info */}
+        <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: 'rgba(31,41,55,0.1)', border: '1px solid rgba(55,65,81,0.2)' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Shield size={16} color="#10b981" />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#d1d5db', fontSize: '0.85rem' }}>How Relay Nodes Work</Typography>
+          </Box>
+          {[
+            'Relay nodes forward encrypted packets between peers',
+            'You cannot read any of the relayed content (onion encryption)',
+            'Higher reputation = trusted by more peers',
+            'Bandwidth throttling prevents abuse',
+            'Rate limiting protects against flooding attacks',
+          ].map((text) => (
+            <Typography key={text} variant="caption" sx={{ color: '#6b7280', display: 'block', fontSize: '0.7rem', pl: 1, mb: 0.5 }}>
+              &bull; {text}
+            </Typography>
+          ))}
+        </Paper>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,10 +1,11 @@
 // ============================================================
-// Main Application Component
+// Main Application Component – MUI + Lucide
 // ============================================================
 
 'use client';
 
-import { useMemo, useCallback, useState, useEffect } from 'react';
+import { useMemo, useCallback, useState } from 'react';
+import Box from '@mui/material/Box';
 import { usePunkNet } from '@/hooks/usePunkNet';
 import SetupScreen from '@/components/SetupScreen';
 import Sidebar from '@/components/Sidebar';
@@ -41,6 +42,8 @@ export default function PunkApp() {
     sendTyping,
     createGroup,
     sendGroupMessage,
+    registerShareCode,
+    lookupShareCode,
     setActiveConversation,
     setShowSettings,
     setShowAddContact,
@@ -132,13 +135,15 @@ export default function PunkApp() {
   }
 
   return (
-    <div className="h-screen flex bg-gray-950 overflow-hidden">
+    <Box sx={{ height: '100vh', display: 'flex', bgcolor: '#030712', overflow: 'hidden' }}>
       {/* Sidebar */}
-      <div
-        className={`
-          ${isMobileChat ? 'hidden md:flex' : 'flex'}
-          w-full md:w-80 lg:w-96 shrink-0 border-r border-gray-800/50
-        `}
+      <Box
+        sx={{
+          display: { xs: isMobileChat ? 'none' : 'flex', md: 'flex' },
+          width: { xs: '100%', md: 320, lg: 384 },
+          flexShrink: 0,
+          borderRight: '1px solid rgba(31,41,55,0.5)',
+        }}
       >
         <Sidebar
           identity={identity}
@@ -153,14 +158,16 @@ export default function PunkApp() {
           onShowRelay={() => setShowRelayDashboard(true)}
           onShowCreateGroup={() => setShowCreateGroup(true)}
         />
-      </div>
+      </Box>
 
       {/* Main Content */}
-      <div
-        className={`
-          ${isMobileChat ? 'flex' : 'hidden md:flex'}
-          flex-1 flex-col min-w-0
-        `}
+      <Box
+        sx={{
+          display: { xs: isMobileChat ? 'flex' : 'none', md: 'flex' },
+          flex: 1,
+          flexDirection: 'column',
+          minWidth: 0,
+        }}
       >
         {activeConversation ? (
           <ChatWindow
@@ -179,7 +186,7 @@ export default function PunkApp() {
         ) : (
           <EmptyChat />
         )}
-      </div>
+      </Box>
 
       {/* Active Call */}
       {activeCall && (
@@ -196,6 +203,8 @@ export default function PunkApp() {
           identity={identity}
           onAddContact={addContact}
           onClose={() => setShowAddContact(false)}
+          onRegisterCode={registerShareCode}
+          onLookupCode={lookupShareCode}
         />
       )}
 
@@ -223,6 +232,6 @@ export default function PunkApp() {
           onClose={() => setShowCreateGroup(false)}
         />
       )}
-    </div>
+    </Box>
   );
 }

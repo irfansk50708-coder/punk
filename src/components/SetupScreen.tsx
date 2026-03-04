@@ -1,19 +1,29 @@
 // ============================================================
-// Setup Screen - Identity creation with key generation
+// Setup Screen – MUI + Lucide
 // ============================================================
 
 'use client';
 
 import { useState } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
+import Paper from '@mui/material/Paper';
+import Stepper from '@mui/material/Stepper';
+import Step from '@mui/material/Step';
+import StepLabel from '@mui/material/StepLabel';
+import CircularProgress from '@mui/material/CircularProgress';
+import Fade from '@mui/material/Fade';
+import Grow from '@mui/material/Grow';
 import {
   Shield,
   Key,
   Fingerprint,
   ArrowRight,
-  Loader2,
   Lock,
+  Sparkles,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface SetupScreenProps {
   onComplete: (displayName: string) => Promise<void>;
@@ -26,9 +36,9 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
   const [error, setError] = useState('');
 
   const steps = [
-    { icon: Key, label: 'Generating encryption keys...' },
-    { icon: Fingerprint, label: 'Creating identity fingerprint...' },
-    { icon: Shield, label: 'Securing your account...' },
+    { icon: Key, label: 'Generating encryption keys' },
+    { icon: Fingerprint, label: 'Creating identity fingerprint' },
+    { icon: Shield, label: 'Securing your account' },
     { icon: Lock, label: 'Ready!' },
   ];
 
@@ -37,171 +47,256 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
       setError('Please enter a display name');
       return;
     }
-
     setIsCreating(true);
     setError('');
-
     try {
-      // Animate through steps
       for (let i = 0; i < steps.length; i++) {
         setStep(i);
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, 700));
       }
-
       await onComplete(displayName.trim());
-    } catch (err) {
+    } catch {
       setError('Failed to create identity. Please try again.');
       setIsCreating(false);
     }
   };
 
+  const features = [
+    { icon: Key, title: 'End-to-End Encrypted', desc: 'Messages encrypted with AES-256-GCM', color: '#10b981' },
+    { icon: Shield, title: 'No Central Server', desc: 'Direct peer-to-peer communication', color: '#3b82f6' },
+    { icon: Fingerprint, title: 'Cryptographic Identity', desc: 'Public/private key pair authentication', color: '#a855f7' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 mb-4 shadow-lg shadow-emerald-500/20">
-            <Shield className="w-10 h-10 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-2">PunkNet</h1>
-          <p className="text-gray-400 text-sm">
-            Decentralized · Encrypted · Private
-          </p>
-        </div>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #030712 0%, #0f172a 40%, #030712 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        p: 2,
+        position: 'relative',
+        overflow: 'hidden',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: '-50%',
+          left: '-50%',
+          width: '200%',
+          height: '200%',
+          background: 'radial-gradient(circle at 30% 70%, rgba(16,185,129,0.04) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(59,130,246,0.03) 0%, transparent 50%)',
+          pointerEvents: 'none',
+        },
+      }}
+    >
+      <Fade in timeout={600}>
+        <Box sx={{ width: '100%', maxWidth: 460, position: 'relative', zIndex: 1 }}>
+          {/* Logo */}
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Box
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 80,
+                height: 80,
+                borderRadius: 4,
+                background: 'linear-gradient(135deg, #10b981 0%, #0d9488 100%)',
+                mb: 2,
+                boxShadow: '0 8px 32px rgba(16,185,129,0.25)',
+                position: 'relative',
+              }}
+            >
+              <Shield size={40} color="#fff" strokeWidth={1.8} />
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -4,
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #f59e0b, #f97316)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Sparkles size={12} color="#fff" />
+              </Box>
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
+              PunkNet
+            </Typography>
+            <Typography variant="subtitle2" sx={{ color: '#6b7280', mt: 0.5, letterSpacing: '0.1em', textTransform: 'uppercase', fontSize: '0.7rem' }}>
+              Decentralized &middot; Encrypted &middot; Private
+            </Typography>
+          </Box>
 
-        {/* Setup Card */}
-        <div className="bg-gray-900/80 backdrop-blur-xl rounded-2xl border border-gray-800 p-6 shadow-2xl">
-          {!isCreating ? (
-            <>
-              <h2 className="text-xl font-semibold text-white mb-1">
-                Create Your Identity
-              </h2>
-              <p className="text-gray-400 text-sm mb-6">
-                Your identity is generated locally using cryptographic keys.
-                No servers, no accounts, no tracking.
-              </p>
+          {/* Setup Card */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 4,
+              borderRadius: 4,
+              border: '1px solid rgba(55,65,81,0.4)',
+              backgroundColor: 'rgba(17,24,39,0.8)',
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+            }}
+          >
+            {!isCreating ? (
+              <Fade in timeout={400}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', mb: 0.5 }}>
+                    Create Your Identity
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#6b7280', mb: 3, lineHeight: 1.6 }}>
+                    Your identity is generated locally using cryptographic keys.
+                    No servers, no accounts, no tracking.
+                  </Typography>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-300 mb-2">
-                    Display Name
-                  </label>
-                  <input
-                    type="text"
+                  <TextField
+                    fullWidth
+                    label="Display Name"
+                    variant="outlined"
                     value={displayName}
-                    onChange={(e) => {
-                      setDisplayName(e.target.value);
-                      setError('');
-                    }}
+                    onChange={(e) => { setDisplayName(e.target.value); setError(''); }}
                     onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                     placeholder="Enter your name..."
-                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
-                    maxLength={32}
                     autoFocus
+                    slotProps={{ htmlInput: { maxLength: 32 } }}
+                    error={!!error}
+                    helperText={error || ' '}
+                    sx={{ mb: 2 }}
                   />
-                  {error && (
-                    <p className="text-red-400 text-xs mt-2">{error}</p>
-                  )}
-                </div>
 
-                <button
-                  onClick={handleCreate}
-                  className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-medium rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30"
-                >
-                  Generate Keys & Create Identity
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Info Cards */}
-              <div className="mt-6 space-y-3">
-                {[
-                  {
-                    icon: Key,
-                    title: 'End-to-End Encrypted',
-                    desc: 'Messages are encrypted with AES-256-GCM',
-                  },
-                  {
-                    icon: Shield,
-                    title: 'No Central Server',
-                    desc: 'Direct peer-to-peer communication',
-                  },
-                  {
-                    icon: Fingerprint,
-                    title: 'Cryptographic Identity',
-                    desc: 'Public/private key pair authentication',
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.title}
-                    className="flex items-start gap-3 p-3 rounded-lg bg-gray-800/30"
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    size="large"
+                    onClick={handleCreate}
+                    endIcon={<ArrowRight size={18} />}
+                    sx={{ py: 1.6, fontSize: '0.95rem', mb: 3 }}
                   >
-                    <item.icon className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-200">
-                        {item.title}
-                      </p>
-                      <p className="text-xs text-gray-500">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            /* Creating Animation */
-            <div className="py-8">
-              <div className="space-y-4">
-                {steps.map((s, i) => {
-                  const StepIcon = s.icon;
-                  const isActive = i === step;
-                  const isDone = i < step;
+                    Generate Keys &amp; Create Identity
+                  </Button>
 
-                  return (
-                    <div
-                      key={i}
-                      className={cn(
-                        'flex items-center gap-3 p-3 rounded-lg transition-all duration-500',
-                        isActive && 'bg-emerald-500/10 border border-emerald-500/20',
-                        isDone && 'opacity-60',
-                        !isActive && !isDone && 'opacity-30'
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          'w-8 h-8 rounded-full flex items-center justify-center transition-all',
-                          isActive && 'bg-emerald-500 text-white',
-                          isDone && 'bg-emerald-500/20 text-emerald-400',
-                          !isActive && !isDone && 'bg-gray-800 text-gray-500'
-                        )}
-                      >
-                        {isActive ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <StepIcon className="w-4 h-4" />
-                        )}
-                      </div>
-                      <span
-                        className={cn(
-                          'text-sm font-medium',
-                          isActive && 'text-emerald-300',
-                          isDone && 'text-gray-400',
-                          !isActive && !isDone && 'text-gray-600'
-                        )}
-                      >
-                        {s.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
+                  {/* Feature Cards */}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {features.map((item, i) => (
+                      <Grow in timeout={400 + i * 150} key={item.title}>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 2,
+                            p: 2,
+                            borderRadius: 2.5,
+                            backgroundColor: 'rgba(31,41,55,0.3)',
+                            border: '1px solid rgba(55,65,81,0.2)',
+                            transition: 'all 0.2s ease',
+                            '&:hover': { backgroundColor: 'rgba(31,41,55,0.5)', borderColor: 'rgba(55,65,81,0.4)' },
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 2,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: `${item.color}15`,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <item.icon size={18} color={item.color} />
+                          </Box>
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#e5e7eb', fontSize: '0.85rem' }}>
+                              {item.title}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#6b7280' }}>
+                              {item.desc}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Grow>
+                    ))}
+                  </Box>
+                </Box>
+              </Fade>
+            ) : (
+              <Fade in timeout={400}>
+                <Box sx={{ py: 4 }}>
+                  <Box sx={{ textAlign: 'center', mb: 4 }}>
+                    <CircularProgress size={48} sx={{ color: '#10b981', mb: 2 }} />
+                    <Typography variant="body2" sx={{ color: '#9ca3af' }}>
+                      Setting up your secure identity...
+                    </Typography>
+                  </Box>
 
-        <p className="text-center text-gray-600 text-xs mt-6">
-          All data is stored locally on your device. Nothing leaves your browser unencrypted.
-        </p>
-      </div>
-    </div>
+                  <Stepper
+                    activeStep={step}
+                    orientation="vertical"
+                    sx={{
+                      '& .MuiStepConnector-line': { borderColor: 'rgba(55,65,81,0.5)', minHeight: 20 },
+                      '& .MuiStepLabel-iconContainer': { pr: 2 },
+                    }}
+                  >
+                    {steps.map((s, i) => {
+                      const StepIcon = s.icon;
+                      return (
+                        <Step key={i} completed={i < step}>
+                          <StepLabel
+                            StepIconComponent={() => (
+                              <Box
+                                sx={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: i <= step ? 'rgba(16,185,129,0.15)' : 'rgba(31,41,55,0.5)',
+                                  border: i === step ? '2px solid #10b981' : '1px solid transparent',
+                                  transition: 'all 0.3s ease',
+                                }}
+                              >
+                                {i === step ? (
+                                  <CircularProgress size={14} sx={{ color: '#10b981' }} />
+                                ) : (
+                                  <StepIcon size={14} color={i < step ? '#10b981' : '#6b7280'} />
+                                )}
+                              </Box>
+                            )}
+                          >
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: i === step ? '#10b981' : i < step ? '#9ca3af' : '#4b5563',
+                                fontWeight: i === step ? 600 : 400,
+                              }}
+                            >
+                              {s.label}
+                            </Typography>
+                          </StepLabel>
+                        </Step>
+                      );
+                    })}
+                  </Stepper>
+                </Box>
+              </Fade>
+            )}
+          </Paper>
+
+          <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', mt: 3, color: '#4b5563', fontSize: '0.7rem' }}>
+            All data is stored locally on your device. Nothing leaves your browser unencrypted.
+          </Typography>
+        </Box>
+      </Fade>
+    </Box>
   );
 }

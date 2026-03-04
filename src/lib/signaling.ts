@@ -228,6 +228,81 @@ export class SignalingClient {
     });
   }
 
+  /**
+   * Register identity data and get a 6-char share code.
+   * The code is valid for ~10 minutes on the bootstrap server.
+   */
+  registerShareCode(identityData: {
+    id: string;
+    displayName: string;
+    publicKey: string;
+    encryptionPublicKey: string;
+  }): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.off('code-registered', handler);
+        reject(new Error('Timed out waiting for code registration'));
+      }, 10000);
+
+      const handler = (data: unknown) => {
+        clearTimeout(timeout);
+        this.off('code-registered', handler);
+        const msg = data as SignalMessage;
+        const payload = msg.payload as { code: string };
+        resolve(payload.code);
+      };
+
+      this.on('code-registered', handler);
+      this.send({
+        type: 'register-code' as SignalType,
+        from: this.peerId,
+        to: 'bootstrap',
+        payload: identityData,
+        timestamp: Date.now(),
+      });
+    });
+  }
+
+  /**
+   * Look up a 6-char share code and return the associated identity data.
+   */
+  lookupShareCode(code: string): Promise<{
+    found: boolean;
+    id?: string;
+    displayName?: string;
+    publicKey?: string;
+    encryptionPublicKey?: string;
+  }> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.off('code-result', handler);
+        reject(new Error('Timed out waiting for code lookup'));
+      }, 10000);
+
+      const handler = (data: unknown) => {
+        clearTimeout(timeout);
+        this.off('code-result', handler);
+        const msg = data as SignalMessage;
+        resolve(msg.payload as {
+          found: boolean;
+          id?: string;
+          displayName?: string;
+          publicKey?: string;
+          encryptionPublicKey?: string;
+        });
+      };
+
+      this.on('code-result', handler);
+      this.send({
+        type: 'lookup-code' as SignalType,
+        from: this.peerId,
+        to: 'bootstrap',
+        payload: { code: code.toUpperCase() },
+        timestamp: Date.now(),
+      });
+    });
+  }
+
   // ─── Event Handling ─────────────────────────────────────
 
   on(event: string, handler: SignalingHandler): void {

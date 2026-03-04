@@ -1,26 +1,34 @@
 // ============================================================
-// Settings Panel
+// Settings Panel – MUI + Lucide
 // ============================================================
 
 'use client';
 
 import { useState } from 'react';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import IconButton from '@mui/material/IconButton';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Avatar from '@mui/material/Avatar';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Divider from '@mui/material/Divider';
+import Collapse from '@mui/material/Collapse';
+import Paper from '@mui/material/Paper';
 import {
   X,
   Shield,
   Key,
   Trash2,
   Download,
-  Upload,
   Copy,
   Check,
-  Moon,
-  Bell,
-  Globe,
   Info,
   AlertTriangle,
 } from 'lucide-react';
-import { cn, generateColor } from '@/lib/utils';
+import { generateColor } from '@/lib/utils';
 import type { Identity } from '@/lib/types';
 import { clearAllData, exportAllData } from '@/lib/db';
 
@@ -42,9 +50,7 @@ export default function SettingsPanel({ identity, onClose }: SettingsProps) {
   const handleExport = async () => {
     try {
       const data = await exportAllData();
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: 'application/json',
-      });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -57,159 +63,139 @@ export default function SettingsPanel({ identity, onClose }: SettingsProps) {
   };
 
   const handleClearData = async () => {
-    if (
-      confirm(
-        'This will delete ALL your data including messages, contacts, and your identity. This cannot be undone. Are you sure?'
-      )
-    ) {
+    if (confirm('This will delete ALL your data including messages, contacts, and your identity. This cannot be undone. Are you sure?')) {
       await clearAllData();
       window.location.reload();
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-gray-900 rounded-2xl border border-gray-800 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-800 sticky top-0 bg-gray-900 z-10">
-          <h2 className="text-white font-semibold">Settings</h2>
-          <button
-            onClick={onClose}
-            className="p-1 text-gray-400 hover:text-white transition-colors"
+    <Dialog open onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4, bgcolor: '#111827', border: '1px solid rgba(55,65,81,0.5)', maxHeight: '90vh' } }}>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem' }}>Settings</Typography>
+        <IconButton onClick={onClose} size="small" sx={{ color: '#9ca3af' }}>
+          <X size={18} />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent sx={{ p: 3 }}>
+        {/* Profile */}
+        <Box sx={{ textAlign: 'center', mb: 3 }}>
+          <Avatar sx={{ width: 72, height: 72, bgcolor: generateColor(identity.id), fontSize: '2rem', fontWeight: 700, mx: 'auto', mb: 1.5 }}>
+            {identity.displayName[0]?.toUpperCase()}
+          </Avatar>
+          <Typography variant="h6" sx={{ fontWeight: 600, color: '#fff', fontSize: '1.1rem' }}>
+            {identity.displayName}
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mt: 0.5 }}>
+            <Typography variant="caption" sx={{ color: '#6b7280', fontFamily: 'monospace', fontSize: '0.7rem' }}>
+              {identity.id.slice(0, 16)}...
+            </Typography>
+            <IconButton size="small" onClick={handleCopyId} sx={{ color: copied ? '#10b981' : '#6b7280', p: 0.5 }}>
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+            </IconButton>
+          </Box>
+        </Box>
+
+        <Divider sx={{ borderColor: 'rgba(55,65,81,0.3)', mb: 2.5 }} />
+
+        {/* Security */}
+        <Box sx={{ mb: 2.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+            <Shield size={16} color="#10b981" />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#fff', fontSize: '0.85rem' }}>Security</Typography>
+          </Box>
+          {[
+            { icon: Key, label: 'End-to-End Encryption', status: 'Active' },
+            { icon: Shield, label: 'Forward Secrecy', status: 'Enabled' },
+          ].map((item) => (
+            <Paper
+              key={item.label}
+              elevation={0}
+              sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, mb: 0.5, borderRadius: 2, bgcolor: 'rgba(31,41,55,0.2)', border: '1px solid rgba(55,65,81,0.2)' }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <item.icon size={16} color="#6b7280" />
+                <Typography variant="body2" sx={{ color: '#d1d5db', fontSize: '0.8rem' }}>{item.label}</Typography>
+              </Box>
+              <Chip label={item.status} size="small" sx={{ bgcolor: 'rgba(16,185,129,0.1)', color: '#10b981', fontSize: '0.65rem', height: 22 }} />
+            </Paper>
+          ))}
+        </Box>
+
+        {/* Data Management */}
+        <Box sx={{ mb: 2.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+            <Download size={16} color="#3b82f6" />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#fff', fontSize: '0.85rem' }}>Data Management</Typography>
+          </Box>
+          <Paper
+            elevation={0}
+            onClick={handleExport}
+            sx={{
+              display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5, borderRadius: 2,
+              bgcolor: 'rgba(31,41,55,0.2)', border: '1px solid rgba(55,65,81,0.2)',
+              cursor: 'pointer', transition: 'all 0.15s',
+              '&:hover': { bgcolor: 'rgba(31,41,55,0.4)' },
+            }}
           >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+            <Download size={16} color="#3b82f6" />
+            <Box>
+              <Typography variant="body2" sx={{ color: '#d1d5db', fontSize: '0.8rem' }}>Export Data</Typography>
+              <Typography variant="caption" sx={{ color: '#4b5563', fontSize: '0.7rem' }}>Download all your messages and contacts</Typography>
+            </Box>
+          </Paper>
+        </Box>
 
-        <div className="p-6 space-y-6">
-          {/* Profile */}
-          <div className="text-center">
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center text-white text-3xl font-bold mx-auto mb-3"
-              style={{ backgroundColor: generateColor(identity.id) }}
-            >
-              {identity.displayName[0]?.toUpperCase()}
-            </div>
-            <h3 className="text-white text-lg font-semibold">
-              {identity.displayName}
-            </h3>
-            <div className="flex items-center justify-center gap-2 mt-1">
-              <p className="text-gray-500 text-xs font-mono">
-                {identity.id.slice(0, 16)}...
-              </p>
-              <button
-                onClick={handleCopyId}
-                className="text-gray-500 hover:text-emerald-400 transition-colors"
+        {/* About */}
+        <Box sx={{ mb: 2.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+            <Info size={16} color="#9ca3af" />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#fff', fontSize: '0.85rem' }}>About</Typography>
+          </Box>
+          <Paper elevation={0} sx={{ p: 1.5, borderRadius: 2, bgcolor: 'rgba(31,41,55,0.2)', border: '1px solid rgba(55,65,81,0.2)' }}>
+            {[
+              ['Version', '1.0.0'],
+              ['Protocol', 'PunkNet v1'],
+              ['Encryption', 'AES-256-GCM + ECDH'],
+              ['Routing', 'Onion (3-hop)'],
+            ].map(([label, value]) => (
+              <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                <Typography variant="caption" sx={{ color: '#6b7280' }}>{label}</Typography>
+                <Typography variant="caption" sx={{ color: '#d1d5db' }}>{value}</Typography>
+              </Box>
+            ))}
+          </Paper>
+        </Box>
+
+        {/* Danger Zone */}
+        <Box>
+          <Button
+            onClick={() => setShowDanger(!showDanger)}
+            startIcon={<AlertTriangle size={14} />}
+            sx={{ color: '#ef4444', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem', pl: 0 }}
+          >
+            Danger Zone
+          </Button>
+          <Collapse in={showDanger}>
+            <Paper elevation={0} sx={{ p: 2, mt: 1, borderRadius: 2, bgcolor: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)' }}>
+              <Typography variant="body2" sx={{ color: '#fca5a5', mb: 2, fontSize: '0.8rem' }}>
+                This will permanently delete all your data including your identity, keys, messages, and contacts.
+              </Typography>
+              <Button
+                fullWidth
+                variant="outlined"
+                color="error"
+                startIcon={<Trash2 size={14} />}
+                onClick={handleClearData}
+                sx={{ textTransform: 'none', fontWeight: 600, borderColor: 'rgba(239,68,68,0.3)', '&:hover': { bgcolor: 'rgba(239,68,68,0.1)' } }}
               >
-                {copied ? (
-                  <Check className="w-3 h-3 text-emerald-400" />
-                ) : (
-                  <Copy className="w-3 h-3" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Security */}
-          <div>
-            <h4 className="text-white text-sm font-medium mb-3 flex items-center gap-2">
-              <Shield className="w-4 h-4 text-emerald-400" />
-              Security
-            </h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Key className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-300 text-sm">End-to-End Encryption</span>
-                </div>
-                <span className="text-emerald-400 text-xs font-medium">Active</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-300 text-sm">Forward Secrecy</span>
-                </div>
-                <span className="text-emerald-400 text-xs font-medium">Enabled</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Data */}
-          <div>
-            <h4 className="text-white text-sm font-medium mb-3 flex items-center gap-2">
-              <Download className="w-4 h-4 text-blue-400" />
-              Data Management
-            </h4>
-            <div className="space-y-2">
-              <button
-                onClick={handleExport}
-                className="w-full flex items-center gap-3 p-3 bg-gray-800/30 rounded-lg text-left hover:bg-gray-800/50 transition-colors"
-              >
-                <Download className="w-4 h-4 text-blue-400" />
-                <div>
-                  <p className="text-gray-300 text-sm">Export Data</p>
-                  <p className="text-gray-600 text-xs">
-                    Download all your messages and contacts
-                  </p>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* About */}
-          <div>
-            <h4 className="text-white text-sm font-medium mb-3 flex items-center gap-2">
-              <Info className="w-4 h-4 text-gray-400" />
-              About
-            </h4>
-            <div className="p-3 bg-gray-800/30 rounded-lg space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Version</span>
-                <span className="text-gray-300">1.0.0</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Protocol</span>
-                <span className="text-gray-300">PunkNet v1</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Encryption</span>
-                <span className="text-gray-300">AES-256-GCM + ECDH</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Routing</span>
-                <span className="text-gray-300">Onion (3-hop)</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Danger Zone */}
-          <div>
-            <button
-              onClick={() => setShowDanger(!showDanger)}
-              className="text-red-400 text-sm font-medium flex items-center gap-2"
-            >
-              <AlertTriangle className="w-4 h-4" />
-              Danger Zone
-            </button>
-
-            {showDanger && (
-              <div className="mt-3 p-4 bg-red-500/5 border border-red-500/20 rounded-lg">
-                <p className="text-red-300 text-sm mb-3">
-                  This will permanently delete all your data including your identity,
-                  keys, messages, and contacts.
-                </p>
-                <button
-                  onClick={handleClearData}
-                  className="w-full py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete All Data
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+                Delete All Data
+              </Button>
+            </Paper>
+          </Collapse>
+        </Box>
+      </DialogContent>
+    </Dialog>
   );
 }

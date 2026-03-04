@@ -1,12 +1,25 @@
 // ============================================================
-// Create Group Modal - UI for creating group chats
+// Create Group Modal – MUI + Lucide
 // ============================================================
 
 'use client';
 
 import { useState, useCallback } from 'react';
-import { X, Users, Check, Search } from 'lucide-react';
-import { cn, generateColor } from '@/lib/utils';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import IconButton from '@mui/material/IconButton';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
+import Avatar from '@mui/material/Avatar';
+import Chip from '@mui/material/Chip';
+import Checkbox from '@mui/material/Checkbox';
+import InputAdornment from '@mui/material/InputAdornment';
+import { X, Users, Search } from 'lucide-react';
+import { generateColor } from '@/lib/utils';
 import type { Contact, Identity } from '@/lib/types';
 
 interface CreateGroupModalProps {
@@ -16,12 +29,7 @@ interface CreateGroupModalProps {
   onClose: () => void;
 }
 
-export default function CreateGroupModal({
-  identity,
-  contacts,
-  onCreateGroup,
-  onClose,
-}: CreateGroupModalProps) {
+export default function CreateGroupModal({ identity, contacts, onCreateGroup, onClose }: CreateGroupModalProps) {
   const [step, setStep] = useState<'members' | 'details'>('members');
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [groupName, setGroupName] = useState('');
@@ -36,18 +44,14 @@ export default function CreateGroupModal({
   const toggleMember = useCallback((contactId: string) => {
     setSelectedMembers((prev) => {
       const next = new Set(prev);
-      if (next.has(contactId)) {
-        next.delete(contactId);
-      } else {
-        next.add(contactId);
-      }
+      if (next.has(contactId)) next.delete(contactId);
+      else next.add(contactId);
       return next;
     });
   }, []);
 
   const handleCreate = useCallback(async () => {
     if (!groupName.trim() || selectedMembers.size === 0) return;
-
     setIsCreating(true);
     try {
       const members = contacts.filter((c) => selectedMembers.has(c.id));
@@ -61,214 +65,167 @@ export default function CreateGroupModal({
   }, [groupName, groupDescription, selectedMembers, contacts, onCreateGroup, onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-gray-900 rounded-2xl w-full max-w-md border border-gray-800 overflow-hidden shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-violet-600/20 flex items-center justify-center">
-              <Users className="w-5 h-5 text-violet-400" />
-            </div>
-            <div>
-              <h2 className="text-white font-semibold">
-                {step === 'members' ? 'Select Members' : 'Group Details'}
-              </h2>
-              <p className="text-xs text-gray-500">
-                {step === 'members'
-                  ? `${selectedMembers.size} selected`
-                  : 'Name your group'}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 4, bgcolor: '#111827', border: '1px solid rgba(55,65,81,0.5)' } }}>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Avatar sx={{ width: 40, height: 40, bgcolor: 'rgba(124,58,237,0.2)' }}>
+            <Users size={20} color="#a78bfa" />
+          </Avatar>
+          <Box>
+            <Typography variant="body1" sx={{ fontWeight: 600, color: '#fff', fontSize: '0.95rem' }}>
+              {step === 'members' ? 'Select Members' : 'Group Details'}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#6b7280' }}>
+              {step === 'members' ? `${selectedMembers.size} selected` : 'Name your group'}
+            </Typography>
+          </Box>
+        </Box>
+        <IconButton onClick={onClose} size="small" sx={{ color: '#6b7280' }}>
+          <X size={18} />
+        </IconButton>
+      </DialogTitle>
 
-        {/* Content */}
-        <div className="p-4">
-          {step === 'members' ? (
-            <>
-              {/* Search */}
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search contacts..."
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-800/50 border border-gray-700 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500/50 transition"
-                />
-              </div>
+      <DialogContent sx={{ p: 2 }}>
+        {step === 'members' ? (
+          <>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search contacts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search size={16} color="#6b7280" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+              sx={{ mb: 2, '& .MuiOutlinedInput-root': { borderRadius: 3, fontSize: '0.8rem' } }}
+            />
 
-              {/* Selected pills */}
-              {selectedMembers.size > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {Array.from(selectedMembers).map((id) => {
-                    const contact = contacts.find((c) => c.id === id);
-                    if (!contact) return null;
-                    return (
-                      <button
-                        key={id}
-                        onClick={() => toggleMember(id)}
-                        className="flex items-center gap-1.5 px-3 py-1 bg-violet-600/20 text-violet-300 rounded-full text-xs hover:bg-violet-600/30 transition"
-                      >
-                        {contact.displayName}
-                        <X className="w-3 h-3" />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Contact list */}
-              <div className="max-h-64 overflow-y-auto space-y-1">
-                {filteredContacts.length === 0 ? (
-                  <p className="text-gray-500 text-sm text-center py-8">
-                    {contacts.length === 0
-                      ? 'No contacts yet. Add contacts first.'
-                      : 'No contacts match your search.'}
-                  </p>
-                ) : (
-                  filteredContacts.map((contact) => {
-                    const isSelected = selectedMembers.has(contact.id);
-                    return (
-                      <button
-                        key={contact.id}
-                        onClick={() => toggleMember(contact.id)}
-                        className={cn(
-                          'w-full flex items-center gap-3 p-3 rounded-xl transition-colors',
-                          isSelected
-                            ? 'bg-violet-600/10 border border-violet-500/30'
-                            : 'hover:bg-gray-800/50 border border-transparent'
-                        )}
-                      >
-                        <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0"
-                          style={{ backgroundColor: generateColor(contact.id) }}
-                        >
-                          {contact.displayName[0]?.toUpperCase()}
-                        </div>
-                        <div className="flex-1 text-left min-w-0">
-                          <p className="text-white text-sm font-medium truncate">
-                            {contact.displayName}
-                          </p>
-                          <p className="text-gray-500 text-xs font-mono truncate">
-                            {contact.id.slice(0, 16)}...
-                          </p>
-                        </div>
-                        <div
-                          className={cn(
-                            'w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors',
-                            isSelected
-                              ? 'bg-violet-600 border-violet-500'
-                              : 'border-gray-600'
-                          )}
-                        >
-                          {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Group name */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-400 mb-2">
-                  Group Name
-                </label>
-                <input
-                  type="text"
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                  placeholder="Enter group name..."
-                  className="w-full px-4 py-2.5 bg-gray-800/50 border border-gray-700 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500/50 transition"
-                  autoFocus
-                  maxLength={50}
-                />
-              </div>
-
-              {/* Group description */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-400 mb-2">
-                  Description (optional)
-                </label>
-                <textarea
-                  value={groupDescription}
-                  onChange={(e) => setGroupDescription(e.target.value)}
-                  placeholder="What's this group about?"
-                  className="w-full px-4 py-2.5 bg-gray-800/50 border border-gray-700 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-violet-500/50 transition resize-none"
-                  rows={3}
-                  maxLength={200}
-                />
-              </div>
-
-              {/* Members preview */}
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">
-                  Members ({selectedMembers.size + 1})
-                </label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {/* You */}
-                  <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600/20 text-emerald-300 rounded-full text-xs">
-                    You (admin)
-                  </div>
-                  {Array.from(selectedMembers).map((id) => {
-                    const contact = contacts.find((c) => c.id === id);
-                    if (!contact) return null;
-                    return (
-                      <div
-                        key={id}
-                        className="flex items-center gap-1.5 px-3 py-1 bg-gray-800 text-gray-300 rounded-full text-xs"
-                      >
-                        {contact.displayName}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-800 flex justify-between">
-          {step === 'details' && (
-            <button
-              onClick={() => setStep('members')}
-              className="px-4 py-2.5 text-gray-400 hover:text-white text-sm font-medium transition-colors"
-            >
-              Back
-            </button>
-          )}
-
-          <div className="ml-auto">
-            {step === 'members' ? (
-              <button
-                onClick={() => setStep('details')}
-                disabled={selectedMembers.size === 0}
-                className="px-6 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium rounded-xl transition-colors"
-              >
-                Next
-              </button>
-            ) : (
-              <button
-                onClick={handleCreate}
-                disabled={!groupName.trim() || isCreating}
-                className="px-6 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium rounded-xl transition-colors"
-              >
-                {isCreating ? 'Creating...' : 'Create Group'}
-              </button>
+            {selectedMembers.size > 0 && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
+                {Array.from(selectedMembers).map((id) => {
+                  const c = contacts.find((c) => c.id === id);
+                  if (!c) return null;
+                  return (
+                    <Chip
+                      key={id}
+                      label={c.displayName}
+                      size="small"
+                      onDelete={() => toggleMember(id)}
+                      sx={{ bgcolor: 'rgba(124,58,237,0.2)', color: '#c4b5fd', fontSize: '0.75rem', '& .MuiChip-deleteIcon': { color: '#a78bfa' } }}
+                    />
+                  );
+                })}
+              </Box>
             )}
-          </div>
-        </div>
-      </div>
-    </div>
+
+            <Box sx={{ maxHeight: 256, overflowY: 'auto' }}>
+              {filteredContacts.length === 0 ? (
+                <Typography variant="body2" sx={{ color: '#6b7280', textAlign: 'center', py: 6 }}>
+                  {contacts.length === 0 ? 'No contacts yet. Add contacts first.' : 'No contacts match your search.'}
+                </Typography>
+              ) : (
+                filteredContacts.map((contact) => {
+                  const isSelected = selectedMembers.has(contact.id);
+                  return (
+                    <Box
+                      key={contact.id}
+                      onClick={() => toggleMember(contact.id)}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        p: 1.5,
+                        borderRadius: 3,
+                        cursor: 'pointer',
+                        bgcolor: isSelected ? 'rgba(124,58,237,0.08)' : 'transparent',
+                        border: isSelected ? '1px solid rgba(124,58,237,0.3)' : '1px solid transparent',
+                        transition: 'all 0.15s',
+                        '&:hover': { bgcolor: isSelected ? 'rgba(124,58,237,0.12)' : 'rgba(31,41,55,0.3)' },
+                        mb: 0.5,
+                      }}
+                    >
+                      <Avatar sx={{ width: 40, height: 40, bgcolor: generateColor(contact.id), fontWeight: 600, fontSize: '0.85rem' }}>
+                        {contact.displayName[0]?.toUpperCase()}
+                      </Avatar>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: '#fff', fontSize: '0.85rem' }} noWrap>
+                          {contact.displayName}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#6b7280', fontFamily: 'monospace', fontSize: '0.65rem' }} noWrap>
+                          {contact.id.slice(0, 16)}...
+                        </Typography>
+                      </Box>
+                      <Checkbox
+                        checked={isSelected}
+                        size="small"
+                        sx={{ color: '#4b5563', '&.Mui-checked': { color: '#7c3aed' } }}
+                      />
+                    </Box>
+                  );
+                })
+              )}
+            </Box>
+          </>
+        ) : (
+          <>
+            <TextField
+              fullWidth
+              label="Group Name"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder="Enter group name..."
+              autoFocus
+              slotProps={{ htmlInput: { maxLength: 50 } }}
+              sx={{ mb: 2 }}
+            />
+
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              label="Description (optional)"
+              value={groupDescription}
+              onChange={(e) => setGroupDescription(e.target.value)}
+              placeholder="What's this group about?"
+              slotProps={{ htmlInput: { maxLength: 200 } }}
+              sx={{ mb: 2 }}
+            />
+
+            <Typography variant="caption" sx={{ color: '#9ca3af', mb: 1, display: 'block' }}>
+              Members ({selectedMembers.size + 1})
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              <Chip label="You (admin)" size="small" sx={{ bgcolor: 'rgba(16,185,129,0.15)', color: '#6ee7b7', fontSize: '0.75rem' }} />
+              {Array.from(selectedMembers).map((id) => {
+                const c = contacts.find((c) => c.id === id);
+                if (!c) return null;
+                return <Chip key={id} label={c.displayName} size="small" sx={{ bgcolor: 'rgba(31,41,55,0.5)', color: '#d1d5db', fontSize: '0.75rem' }} />;
+              })}
+            </Box>
+          </>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: 2, pb: 2, justifyContent: 'space-between' }}>
+        {step === 'details' ? (
+          <Button onClick={() => setStep('members')} sx={{ color: '#9ca3af' }}>Back</Button>
+        ) : <Box />}
+        {step === 'members' ? (
+          <Button variant="contained" color="secondary" onClick={() => setStep('details')} disabled={selectedMembers.size === 0}>
+            Next
+          </Button>
+        ) : (
+          <Button variant="contained" color="secondary" onClick={handleCreate} disabled={!groupName.trim() || isCreating}>
+            {isCreating ? 'Creating...' : 'Create Group'}
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
   );
 }

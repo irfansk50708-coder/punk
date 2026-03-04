@@ -71,9 +71,10 @@ export function usePunkNet() {
         groupRef.current = createGroupChatManager(
           identity.id,
           identity.displayName,
-          identity.publicKey,
+          identity.encryptionPublicKey,
           identity.signingPrivateKey,
-          identity.encryptionPrivateKey
+          identity.encryptionPrivateKey,
+          identity.publicKey
         );
 
         // Load groups
@@ -137,7 +138,7 @@ export function usePunkNet() {
 
     // Start subsystems
     messagingRef.current = createMessagingEngine(id, encPrivKey, sigPrivKey);
-    groupRef.current = createGroupChatManager(id, displayName, pubKey, sigPrivKey, encPrivKey);
+    groupRef.current = createGroupChatManager(id, displayName, encPubKey, sigPrivKey, encPrivKey, pubKey);
     initSignaling(id, pubKey);
 
     return identity;
@@ -432,6 +433,7 @@ export function usePunkNet() {
           id: m.id,
           displayName: m.displayName,
           publicKey: m.encryptionPublicKey,
+          signingPublicKey: m.publicKey,
         }))
       );
 
@@ -468,6 +470,42 @@ export function usePunkNet() {
     },
     []
   );
+
+  // ─── Short Code Sharing ───────────────────────────────
+  const registerShareCode = useCallback(async (): Promise<string | null> => {
+    if (!signalingRef.current || !store.identity) return null;
+    try {
+      const code = await signalingRef.current.registerShareCode({
+        id: store.identity.id,
+        displayName: store.identity.displayName,
+        publicKey: store.identity.publicKey,
+        encryptionPublicKey: store.identity.encryptionPublicKey,
+      });
+      return code;
+    } catch (err) {
+      console.error('[PunkNet] Failed to register share code:', err);
+      return null;
+    }
+  }, []);
+
+  const lookupShareCode = useCallback(async (code: string) => {
+    if (!signalingRef.current) return null;
+    try {
+      const result = await signalingRef.current.lookupShareCode(code);
+      if (result.found && result.id && result.publicKey && result.encryptionPublicKey) {
+        return {
+          id: result.id,
+          displayName: result.displayName || 'Unknown',
+          publicKey: result.publicKey,
+          encryptionPublicKey: result.encryptionPublicKey,
+        };
+      }
+      return null;
+    } catch (err) {
+      console.error('[PunkNet] Failed to lookup share code:', err);
+      return null;
+    }
+  }, []);
 
   // ─── Initialize on mount ──────────────────────────────────
   useEffect(() => {
@@ -506,6 +544,8 @@ export function usePunkNet() {
     sendTyping,
     createGroup,
     sendGroupMessage,
+    registerShareCode,
+    lookupShareCode,
 
     setActiveConversation: store.setActiveConversation,
     setShowSettings: store.setShowSettings,

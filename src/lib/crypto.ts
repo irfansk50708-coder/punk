@@ -153,8 +153,16 @@ export async function deriveSharedKey(
     ['deriveKey']
   );
 
-  // Use HKDF to derive AES key
-  const useSalt = salt || crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+  // Deterministic salt: if none provided, derive from ECDH shared bits
+  // This ensures both sides always compute the same salt.
+  let useSalt: Uint8Array;
+  if (salt) {
+    useSalt = salt;
+  } else {
+    const saltHash = await crypto.subtle.digest('SHA-256', sharedBits);
+    useSalt = new Uint8Array(saltHash).slice(0, SALT_LENGTH);
+  }
+
   const aesKey = await crypto.subtle.deriveKey(
     {
       name: 'HKDF',

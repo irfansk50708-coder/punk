@@ -1,10 +1,17 @@
 // ============================================================
-// Call Screen - Voice and Video calling UI
+// Call Screen – MUI + Lucide
 // ============================================================
 
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Avatar from '@mui/material/Avatar';
+import Fab from '@mui/material/Fab';
+import IconButton from '@mui/material/IconButton';
+import Paper from '@mui/material/Paper';
+import Fade from '@mui/material/Fade';
 import {
   Phone,
   PhoneOff,
@@ -15,9 +22,8 @@ import {
   Volume2,
   Minimize2,
   Maximize2,
-  RotateCcw,
 } from 'lucide-react';
-import { cn, generateColor } from '@/lib/utils';
+import { generateColor } from '@/lib/utils';
 import type { Call, Contact } from '@/lib/types';
 import { getWebRTCManager } from '@/lib/webrtc';
 
@@ -39,233 +45,216 @@ export default function CallScreen({ call, contact, onEndCall }: CallScreenProps
   const isVideo = call.type === 'video';
   const webrtc = getWebRTCManager();
 
-  // Call duration timer
   useEffect(() => {
     if (call.status !== 'connected') return;
-
-    const timer = setInterval(() => {
-      setCallDuration((d) => d + 1);
-    }, 1000);
-
+    const timer = setInterval(() => setCallDuration((d) => d + 1), 1000);
     return () => clearInterval(timer);
   }, [call.status]);
 
-  // Set up video streams
   useEffect(() => {
     const localStream = webrtc.getLocalStream();
-    if (localStream && localVideoRef.current) {
-      localVideoRef.current.srcObject = localStream;
-    }
+    if (localStream && localVideoRef.current) localVideoRef.current.srcObject = localStream;
 
     const handleMediaStream = (event: { type: string; peerId: string; data?: unknown }) => {
-      if (remoteVideoRef.current && event.data instanceof MediaStream) {
-        remoteVideoRef.current.srcObject = event.data;
-      }
+      if (remoteVideoRef.current && event.data instanceof MediaStream) remoteVideoRef.current.srcObject = event.data;
     };
-
     webrtc.on('media-stream', handleMediaStream);
-
-    return () => {
-      webrtc.off('media-stream', handleMediaStream);
-    };
+    return () => { webrtc.off('media-stream', handleMediaStream); };
   }, []);
 
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-    webrtc.toggleAudio(!isMuted);
-  };
+  const toggleMute = () => { setIsMuted(!isMuted); webrtc.toggleAudio(!isMuted); };
+  const toggleVideo = () => { setIsVideoOff(!isVideoOff); webrtc.toggleVideo(!isVideoOff); };
 
-  const toggleVideo = () => {
-    setIsVideoOff(!isVideoOff);
-    webrtc.toggleVideo(!isVideoOff);
-  };
-
-  const formatDuration = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  const formatDuration = (s: number) => {
+    const m = Math.floor(s / 60);
+    return `${m.toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
   };
 
   const getStatusText = () => {
     switch (call.status) {
-      case 'ringing':
-        return 'Ringing...';
-      case 'connecting':
-        return 'Connecting...';
-      case 'connected':
-        return formatDuration(callDuration);
-      case 'ended':
-        return 'Call ended';
-      case 'missed':
-        return 'Missed call';
-      case 'rejected':
-        return 'Call rejected';
-      default:
-        return '';
+      case 'ringing': return 'Ringing...';
+      case 'connecting': return 'Connecting...';
+      case 'connected': return formatDuration(callDuration);
+      case 'ended': return 'Call ended';
+      case 'missed': return 'Missed call';
+      case 'rejected': return 'Call rejected';
+      default: return '';
     }
   };
 
+  // Minimized PIP
   if (isMinimized) {
     return (
-      <div className="fixed bottom-4 right-4 z-50 bg-gray-900 rounded-2xl border border-gray-700 shadow-2xl p-4 flex items-center gap-3">
-        <div
-          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm"
-          style={{ backgroundColor: generateColor(call.receiverId) }}
+      <Fade in>
+        <Paper
+          elevation={8}
+          sx={{
+            position: 'fixed',
+            bottom: 16,
+            right: 16,
+            zIndex: 50,
+            borderRadius: 4,
+            border: '1px solid rgba(55,65,81,0.5)',
+            bgcolor: '#111827',
+            p: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+          }}
         >
-          {displayName[0]?.toUpperCase()}
-        </div>
-        <div>
-          <p className="text-white text-sm font-medium">{displayName}</p>
-          <p className="text-emerald-400 text-xs">{getStatusText()}</p>
-        </div>
-        <div className="flex items-center gap-2 ml-2">
-          <button
-            onClick={() => setIsMinimized(false)}
-            className="p-2 text-gray-400 hover:text-white transition-colors"
-          >
-            <Maximize2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onEndCall}
-            className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
-          >
-            <PhoneOff className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+          <Avatar sx={{ width: 40, height: 40, bgcolor: generateColor(call.receiverId), fontWeight: 600 }}>
+            {displayName[0]?.toUpperCase()}
+          </Avatar>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#fff', fontSize: '0.85rem' }}>
+              {displayName}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#10b981' }}>
+              {getStatusText()}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1, ml: 1 }}>
+            <IconButton size="small" onClick={() => setIsMinimized(false)} sx={{ color: '#9ca3af' }}>
+              <Maximize2 size={16} />
+            </IconButton>
+            <Fab size="small" onClick={onEndCall} sx={{ bgcolor: '#ef4444', color: '#fff', '&:hover': { bgcolor: '#dc2626' }, width: 36, height: 36 }}>
+              <PhoneOff size={16} />
+            </Fab>
+          </Box>
+        </Paper>
+      </Fade>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-gray-950 flex flex-col">
-      {/* Video Area */}
+    <Box sx={{ position: 'fixed', inset: 0, zIndex: 50, bgcolor: '#030712', display: 'flex', flexDirection: 'column' }}>
+      {/* Video / Voice Area */}
       {isVideo ? (
-        <div className="flex-1 relative bg-black">
-          {/* Remote Video */}
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            className="w-full h-full object-cover"
-          />
+        <Box sx={{ flex: 1, position: 'relative', bgcolor: '#000' }}>
+          <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
 
           {/* Local Video PIP */}
-          <div className="absolute top-4 right-4 w-32 h-44 md:w-48 md:h-64 rounded-2xl overflow-hidden border-2 border-gray-700 shadow-2xl bg-gray-900">
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              className={cn(
-                'w-full h-full object-cover',
-                isVideoOff && 'hidden'
-              )}
-            />
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              width: { xs: 120, md: 180 },
+              height: { xs: 160, md: 240 },
+              borderRadius: 4,
+              overflow: 'hidden',
+              border: '2px solid rgba(55,65,81,0.5)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              bgcolor: '#1f2937',
+            }}
+          >
+            <video ref={localVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: isVideoOff ? 'none' : 'block' }} />
             {isVideoOff && (
-              <div className="w-full h-full flex items-center justify-center bg-gray-800">
-                <VideoOff className="w-8 h-8 text-gray-500" />
-              </div>
+              <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <VideoOff size={32} color="#6b7280" />
+              </Box>
             )}
-          </div>
+          </Box>
 
           {/* Status Overlay */}
           {call.status !== 'connected' && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-              <div className="text-center">
-                <div
-                  className="w-24 h-24 rounded-full flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4"
-                  style={{ backgroundColor: generateColor(call.receiverId) }}
-                >
+            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'rgba(0,0,0,0.6)' }}>
+              <Box sx={{ textAlign: 'center' }}>
+                <Avatar sx={{ width: 96, height: 96, bgcolor: generateColor(call.receiverId), fontSize: '2.5rem', fontWeight: 700, mx: 'auto', mb: 2 }}>
                   {displayName[0]?.toUpperCase()}
-                </div>
-                <p className="text-white text-xl font-semibold">{displayName}</p>
-                <p className="text-gray-300 mt-2 animate-pulse">{getStatusText()}</p>
-              </div>
-            </div>
+                </Avatar>
+                <Typography variant="h5" sx={{ color: '#fff', fontWeight: 600 }}>{displayName}</Typography>
+                <Typography variant="body2" sx={{ color: '#d1d5db', mt: 1, animation: 'pulse 2s infinite', '@keyframes pulse': { '0%, 100%': { opacity: 1 }, '50%': { opacity: 0.5 } } }}>
+                  {getStatusText()}
+                </Typography>
+              </Box>
+            </Box>
           )}
-        </div>
+        </Box>
       ) : (
-        /* Voice Call */
-        <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-b from-gray-900 to-gray-950">
-          <div className="relative">
-            <div
-              className={cn(
-                'w-32 h-32 rounded-full flex items-center justify-center text-white text-5xl font-bold shadow-2xl',
-                call.status === 'connected' && 'ring-4 ring-emerald-500/30 animate-pulse'
-              )}
-              style={{ backgroundColor: generateColor(call.receiverId) }}
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg, #111827 0%, #030712 100%)' }}>
+          <Box sx={{ position: 'relative' }}>
+            <Avatar
+              sx={{
+                width: 128,
+                height: 128,
+                bgcolor: generateColor(call.receiverId),
+                fontSize: '3.5rem',
+                fontWeight: 700,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                ...(call.status === 'connected' ? { boxShadow: '0 0 0 6px rgba(16,185,129,0.2)', animation: 'pulse 2s infinite' } : {}),
+              }}
             >
               {displayName[0]?.toUpperCase()}
-            </div>
+            </Avatar>
             {call.status === 'ringing' && (
-              <div className="absolute inset-0 rounded-full border-4 border-emerald-500/30 animate-ping" />
+              <Box sx={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '4px solid rgba(16,185,129,0.3)', animation: 'ping 1s cubic-bezier(0,0,0.2,1) infinite', '@keyframes ping': { '0%': { transform: 'scale(1)', opacity: 1 }, '75%, 100%': { transform: 'scale(1.3)', opacity: 0 } } }} />
             )}
-          </div>
-
-          <h2 className="text-white text-2xl font-semibold mt-6">{displayName}</h2>
-          <p
-            className={cn(
-              'text-lg mt-2',
-              call.status === 'connected' ? 'text-emerald-400' : 'text-gray-400'
-            )}
-          >
+          </Box>
+          <Typography variant="h5" sx={{ color: '#fff', fontWeight: 600, mt: 3 }}>{displayName}</Typography>
+          <Typography variant="body1" sx={{ color: call.status === 'connected' ? '#10b981' : '#9ca3af', mt: 1, fontSize: '1.1rem' }}>
             {getStatusText()}
-          </p>
-        </div>
+          </Typography>
+        </Box>
       )}
 
       {/* Controls */}
-      <div className="bg-gray-950/90 backdrop-blur-sm border-t border-gray-800/50 py-6 px-4">
-        <div className="flex items-center justify-center gap-4">
-          <button
+      <Box sx={{ bgcolor: 'rgba(3,7,18,0.9)', backdropFilter: 'blur(12px)', borderTop: '1px solid rgba(55,65,81,0.3)', py: 3, px: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+          <Fab
+            size="medium"
             onClick={toggleMute}
-            className={cn(
-              'w-14 h-14 rounded-full flex items-center justify-center transition-all',
-              isMuted
-                ? 'bg-red-500/20 text-red-400'
-                : 'bg-gray-800 text-white hover:bg-gray-700'
-            )}
+            sx={{
+              bgcolor: isMuted ? 'rgba(239,68,68,0.2)' : '#1f2937',
+              color: isMuted ? '#ef4444' : '#fff',
+              '&:hover': { bgcolor: isMuted ? 'rgba(239,68,68,0.3)' : '#374151' },
+            }}
           >
-            {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-          </button>
+            {isMuted ? <MicOff size={22} /> : <Mic size={22} />}
+          </Fab>
 
           {isVideo && (
-            <button
+            <Fab
+              size="medium"
               onClick={toggleVideo}
-              className={cn(
-                'w-14 h-14 rounded-full flex items-center justify-center transition-all',
-                isVideoOff
-                  ? 'bg-red-500/20 text-red-400'
-                  : 'bg-gray-800 text-white hover:bg-gray-700'
-              )}
+              sx={{
+                bgcolor: isVideoOff ? 'rgba(239,68,68,0.2)' : '#1f2937',
+                color: isVideoOff ? '#ef4444' : '#fff',
+                '&:hover': { bgcolor: isVideoOff ? 'rgba(239,68,68,0.3)' : '#374151' },
+              }}
             >
-              {isVideoOff ? (
-                <VideoOff className="w-6 h-6" />
-              ) : (
-                <Video className="w-6 h-6" />
-              )}
-            </button>
+              {isVideoOff ? <VideoOff size={22} /> : <Video size={22} />}
+            </Fab>
           )}
 
-          <button className="w-14 h-14 rounded-full bg-gray-800 text-white hover:bg-gray-700 flex items-center justify-center transition-all">
-            <Volume2 className="w-6 h-6" />
-          </button>
+          <Fab size="medium" sx={{ bgcolor: '#1f2937', color: '#fff', '&:hover': { bgcolor: '#374151' } }}>
+            <Volume2 size={22} />
+          </Fab>
 
-          <button
+          <Fab
+            size="large"
             onClick={onEndCall}
-            className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-all shadow-lg shadow-red-500/30"
+            sx={{
+              bgcolor: '#ef4444',
+              color: '#fff',
+              '&:hover': { bgcolor: '#dc2626' },
+              boxShadow: '0 4px 20px rgba(239,68,68,0.4)',
+              width: 64,
+              height: 64,
+            }}
           >
-            <PhoneOff className="w-7 h-7" />
-          </button>
+            <PhoneOff size={28} />
+          </Fab>
 
-          <button
+          <Fab
+            size="medium"
             onClick={() => setIsMinimized(true)}
-            className="w-14 h-14 rounded-full bg-gray-800 text-white hover:bg-gray-700 flex items-center justify-center transition-all"
+            sx={{ bgcolor: '#1f2937', color: '#fff', '&:hover': { bgcolor: '#374151' } }}
           >
-            <Minimize2 className="w-6 h-6" />
-          </button>
-        </div>
-      </div>
-    </div>
+            <Minimize2 size={22} />
+          </Fab>
+        </Box>
+      </Box>
+    </Box>
   );
 }

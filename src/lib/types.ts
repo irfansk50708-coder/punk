@@ -61,6 +61,12 @@ export interface EncryptedMessage {
   ephemeralPublicKey: string; // base64
   timestamp: number;
   signature: string;        // base64 message signature
+  senderSigningKey?: string; // base64 ECDSA public key for verification
+  ratchetHeader?: {          // present when using Double Ratchet
+    publicKey: string;
+    messageNumber: number;
+    previousChainLength: number;
+  };
 }
 
 // ─── Conversations ───────────────────────────────────────────
@@ -193,7 +199,11 @@ export type SignalType =
   | 'call-reject'
   | 'call-end'
   | 'typing'
-  | 'presence';
+  | 'presence'
+  | 'register-code'
+  | 'lookup-code'
+  | 'code-registered'
+  | 'code-result';
 
 export interface SignalMessage {
   type: SignalType;
@@ -257,7 +267,8 @@ export interface GroupInfo {
 export interface GroupMember {
   id: string;
   displayName: string;
-  publicKey: string;
+  publicKey: string;           // ECDH encryption public key (base64)
+  signingPublicKey?: string;   // ECDSA signing public key (base64)
   role: 'admin' | 'member';
   joinedAt: number;
 }

@@ -16,8 +16,10 @@ import {
   decrypt,
   generateNonce,
   sign,
+  verify,
   exportPublicKey,
   importECDSAPrivateKey,
+  importECDSAPublicKey,
   importECDHPublicKey,
   importECDHPrivateKey,
   deriveSharedKey,
@@ -116,6 +118,7 @@ export class GroupChatManager {
   private myId: string;
   private myDisplayName: string;
   private myPublicKey: string;
+  private mySigningPublicKey: string;
   private signingPrivateKey: string;
   private encryptionPrivateKey: string;
   private groups: Map<string, GroupInfo> = new Map();
@@ -128,13 +131,15 @@ export class GroupChatManager {
     myDisplayName: string,
     myPublicKey: string,
     signingPrivateKey: string,
-    encryptionPrivateKey: string
+    encryptionPrivateKey: string,
+    signingPublicKey: string
   ) {
     this.myId = myId;
     this.myDisplayName = myDisplayName;
     this.myPublicKey = myPublicKey;
     this.signingPrivateKey = signingPrivateKey;
     this.encryptionPrivateKey = encryptionPrivateKey;
+    this.mySigningPublicKey = signingPublicKey;
   }
 
   // ─── Event Handlers ─────────────────────────────────────
@@ -161,7 +166,7 @@ export class GroupChatManager {
   async createGroup(
     name: string,
     description?: string,
-    initialMembers: Array<{ id: string; displayName: string; publicKey: string }> = []
+    initialMembers: Array<{ id: string; displayName: string; publicKey: string; signingPublicKey?: string }> = []
   ): Promise<GroupInfo> {
     const groupId = `group-${uuidv4()}`;
     const groupKey = await generateGroupKey();
@@ -175,6 +180,7 @@ export class GroupChatManager {
           id: this.myId,
           displayName: this.myDisplayName,
           publicKey: this.myPublicKey,
+          signingPublicKey: this.mySigningPublicKey,
           role: 'admin',
           joinedAt: Date.now(),
         },
@@ -182,6 +188,7 @@ export class GroupChatManager {
           id: m.id,
           displayName: m.displayName,
           publicKey: m.publicKey,
+          signingPublicKey: m.signingPublicKey,
           role: 'member' as const,
           joinedAt: Date.now(),
         })),
@@ -472,6 +479,24 @@ export class GroupChatManager {
         console.warn('[GroupChat] Key version mismatch, may need key refresh');
       }
 
+      // Verify sender's signature
+      let signatureValid = false;
+      const senderMember = group.members.find((m) => m.id === msg.senderId);
+      if (senderMember?.signingPublicKey) {
+        try {
+          const sigPubKey = await importECDSAPublicKey(senderMember.signingPublicKey);
+          signatureValid = await verify(sigPubKey, payload.ciphertext, payload.senderSignature);
+        } catch (err) {
+          console.warn('[GroupChat] Signature verification error:', err);
+        }
+      }
+
+      if (!signatureValid) {
+        console.warn(
+          `[GroupChat] ⚠ Signature verification FAILED for group message from ${msg.senderId} in ${msg.groupId}`
+        );
+      }
+
       // Decrypt with group key
       const plaintext = await decryptWithGroupKey(group.groupKey, payload.ciphertext, payload.nonce);
       const parsed = JSON.parse(plaintext);
@@ -485,7 +510,10 @@ export class GroupChatManager {
         content: parsed.content,
         timestamp: parsed.timestamp || msg.timestamp,
         status: 'delivered',
-        metadata: { senderName: parsed.senderName },
+        metadata: {
+          senderName: parsed.senderName,
+          verified: signatureValid,
+        },
       };
 
       // Save message
@@ -918,11 +946,12 @@ export function createGroupChatManager(
   myDisplayName: string,
   myPublicKey: string,
   signingPrivateKey: string,
-  encryptionPrivateKey: string
+  encryptionPrivateKey: string,
+  signingPublicKey: string
 ): GroupChatManager {
   if (manager) {
     manager.destroy();
   }
-  manager = new GroupChatManager(myId, myDisplayName, myPublicKey, signingPrivateKey, encryptionPrivateKey);
+  manager = new GroupChatManager(myId, myDisplayName, myPublicKey, signingPrivateKey, encryptionPrivateKey, signingPublicKey);
   return manager;
 }

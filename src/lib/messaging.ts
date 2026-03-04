@@ -2,6 +2,7 @@
 // Messaging System - Core messaging engine
 // Handles E2E encrypted message sending/receiving,
 // delivery confirmations, read receipts, typing indicators
+// Double Ratchet for forward secrecy, onion routing
 // ============================================================
 
 import { v4 as uuidv4 } from 'uuid';
@@ -26,6 +27,11 @@ import {
   exportPublicKey,
   generateEncryptionKeyPair,
   generateNonce,
+  initRatchetAsInitiator,
+  initRatchetAsResponder,
+  ratchetEncrypt,
+  ratchetDecrypt,
+  type RatchetState,
 } from '@/lib/crypto';
 import { getWebRTCManager } from '@/lib/webrtc';
 import { getOnionRouter } from '@/lib/onion';
@@ -35,6 +41,7 @@ import {
   getConversation,
   getOrCreateDirectConversation,
   updateMessageStatus,
+  getContact,
 } from '@/lib/db';
 
 type MessageHandler = (message: Message) => void;
@@ -45,16 +52,42 @@ export class MessagingEngine {
   private myId: string;
   private encryptionPrivateKey: string;
   private signingPrivateKey: string;
+  private signingPublicKeyBase64: string | null = null; // cached
   private messageHandlers: Set<MessageHandler> = new Set();
   private typingHandlers: Set<TypingHandler> = new Set();
   private statusHandlers: Set<StatusHandler> = new Set();
   private offlineQueue: Map<string, EncryptedMessage[]> = new Map();
   private typingTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
+  // Double Ratchet state per peer
+  private ratchetStates: Map<string, RatchetState> = new Map();
+
   constructor(myId: string, encryptionPrivateKey: string, signingPrivateKey: string) {
     this.myId = myId;
     this.encryptionPrivateKey = encryptionPrivateKey;
     this.signingPrivateKey = signingPrivateKey;
+  }
+
+  /** Cache our own signing public key for inclusion in messages */
+  private async getSigningPublicKey(): Promise<string> {
+    if (!this.signingPublicKeyBase64) {
+      const privKey = await importECDSAPrivateKey(this.signingPrivateKey);
+      // Re‐derive public key by exporting the JWK and re-importing as public
+      const jwk = JSON.parse(atob(this.signingPrivateKey));
+      // Remove private component to get public key
+      const pubJwk = { ...jwk };
+      delete pubJwk.d;
+      pubJwk.key_ops = ['verify'];
+      const pubKey = await crypto.subtle.importKey(
+        'jwk',
+        pubJwk,
+        { name: 'ECDSA', namedCurve: 'P-256' },
+        true,
+        ['verify']
+      );
+      this.signingPublicKeyBase64 = await exportPublicKey(pubKey);
+    }
+    return this.signingPublicKeyBase64;
   }
 
   // ─── Event Handlers ─────────────────────────────────────
@@ -103,15 +136,60 @@ export class MessagingEngine {
     try {
       const encrypted = await this.encryptMessage(message, recipientPublicKey);
 
-      // Try to send via WebRTC DataChannel first
+      const payload = JSON.stringify({
+        type: 'encrypted-message',
+        payload: encrypted,
+      });
+
+      // Attempt onion-routed delivery first
+      let sent = false;
+      const onion = getOnionRouter();
       const webrtc = getWebRTCManager();
-      const sent = webrtc.sendData(
-        recipientId,
-        JSON.stringify({
-          type: 'encrypted-message',
-          payload: encrypted,
-        })
-      );
+
+      // Look up available relays from known peers
+      try {
+        const peers = webrtc.getConnectedPeerIds();
+        if (peers.length >= 3) {
+          // We have enough peers to try onion routing
+          // Build pseudo PeerInfo for circuit building
+          const peerInfos = peers
+            .filter((id) => id !== recipientId)
+            .map((id) => ({
+              id,
+              publicKey: '', // relay keys resolved at circuit build
+              addresses: [] as string[],
+              lastSeen: Date.now(),
+              reputation: 50,
+              isRelay: true, // optimistic — circuit build will verify
+            }));
+
+          // Only attempt if we have relay candidates
+          if (peerInfos.length >= 3) {
+            const circuit = await onion.buildCircuit(peerInfos, recipientId, recipientPublicKey);
+            if (circuit && circuit.path.length > 1) {
+              // Multi-hop circuit available
+              const packet = await onion.wrapMessage(circuit.id, payload);
+              if (packet) {
+                const firstHop = circuit.path[0].peerId;
+                sent = webrtc.sendData(
+                  firstHop,
+                  JSON.stringify({ type: 'onion-packet', payload: packet })
+                );
+                if (sent) {
+                  console.log('[Messaging] Message sent via onion circuit', circuit.id);
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Messaging] Onion routing failed, falling back to direct:', err);
+      }
+
+      // Fallback: send directly via WebRTC DataChannel
+      if (!sent) {
+        sent = webrtc.sendData(recipientId, payload);
+      }
 
       if (sent) {
         message.status = 'sent';
@@ -195,23 +273,15 @@ export class MessagingEngine {
     }
   }
 
-  // ─── Encryption ─────────────────────────────────────────
+  // ─── Encryption (with Double Ratchet) ───────────────────
 
   private async encryptMessage(
     message: Message,
     recipientPublicKey: string
   ): Promise<EncryptedMessage> {
-    // Generate ephemeral key pair for this message
-    const ephemeral = await generateEncryptionKeyPair();
     const recipientKey = await importECDHPublicKey(recipientPublicKey);
+    const senderSigningKey = await this.getSigningPublicKey();
 
-    // Derive shared secret
-    const { key: sharedKey } = await deriveSharedKey(
-      ephemeral.privateKey,
-      recipientKey
-    );
-
-    // Encrypt content
     const plaintext = JSON.stringify({
       id: message.id,
       type: message.type,
@@ -220,7 +290,46 @@ export class MessagingEngine {
       conversationId: message.conversationId,
     });
 
-    const { ciphertext, nonce } = await encrypt(sharedKey, plaintext);
+    let ciphertext: string;
+    let nonce: string;
+    let ephemeralPublicKey: string;
+    let ratchetHeader: EncryptedMessage['ratchetHeader'];
+
+    // Try Double Ratchet if we have an established session
+    const ratchetState = this.ratchetStates.get(message.recipientId);
+    if (ratchetState && ratchetState.sendChainKey) {
+      try {
+        const result = await ratchetEncrypt(ratchetState, plaintext);
+        this.ratchetStates.set(message.recipientId, result.state);
+        ciphertext = result.ciphertext;
+        nonce = result.nonce;
+        ratchetHeader = result.header;
+        ephemeralPublicKey = result.header.publicKey;
+      } catch (err) {
+        console.warn('[Messaging] Ratchet encrypt failed, falling back to ephemeral ECDH:', err);
+        // Fall through to ephemeral ECDH below
+        const result = await this.ephemeralEncrypt(plaintext, recipientKey);
+        ciphertext = result.ciphertext;
+        nonce = result.nonce;
+        ephemeralPublicKey = result.ephemeralPublicKey;
+      }
+    } else {
+      // First message to this peer — use ephemeral ECDH and initialize ratchet
+      const result = await this.ephemeralEncrypt(plaintext, recipientKey);
+      ciphertext = result.ciphertext;
+      nonce = result.nonce;
+      ephemeralPublicKey = result.ephemeralPublicKey;
+
+      // Initialize ratchet for future messages
+      try {
+        const ephPrivKey = result._ephemeralPrivateKey;
+        const { key: sharedSecret } = await deriveSharedKey(ephPrivKey, recipientKey);
+        const state = await initRatchetAsInitiator(sharedSecret, recipientKey);
+        this.ratchetStates.set(message.recipientId, state);
+      } catch (err) {
+        console.warn('[Messaging] Ratchet init failed:', err);
+      }
+    }
 
     // Sign the ciphertext
     const signingKey = await importECDSAPrivateKey(this.signingPrivateKey);
@@ -232,22 +341,110 @@ export class MessagingEngine {
       recipientId: message.recipientId,
       ciphertext,
       nonce,
-      ephemeralPublicKey: await exportPublicKey(ephemeral.publicKey),
+      ephemeralPublicKey,
       timestamp: message.timestamp,
       signature,
+      senderSigningKey,
+      ratchetHeader,
+    };
+  }
+
+  /** Encrypt with a one-off ephemeral ECDH key pair */
+  private async ephemeralEncrypt(
+    plaintext: string,
+    recipientKey: CryptoKey
+  ): Promise<{
+    ciphertext: string;
+    nonce: string;
+    ephemeralPublicKey: string;
+    _ephemeralPrivateKey: CryptoKey;
+  }> {
+    const ephemeral = await generateEncryptionKeyPair();
+    const { key: sharedKey } = await deriveSharedKey(ephemeral.privateKey, recipientKey);
+    const { ciphertext, nonce } = await encrypt(sharedKey, plaintext);
+    return {
+      ciphertext,
+      nonce,
+      ephemeralPublicKey: await exportPublicKey(ephemeral.publicKey),
+      _ephemeralPrivateKey: ephemeral.privateKey,
     };
   }
 
   private async decryptMessage(encrypted: EncryptedMessage): Promise<Message> {
-    // Import our private key
-    const myPrivateKey = await importECDHPrivateKey(this.encryptionPrivateKey);
-    const ephemeralPublic = await importECDHPublicKey(encrypted.ephemeralPublicKey);
+    // ── 1. Verify signature ────────────────────────────────
+    let signatureValid = false;
+    try {
+      // Try to get the sender's signing key from the contact DB
+      let signingPubKeyBase64 = encrypted.senderSigningKey;
 
-    // Derive shared secret
-    const { key: sharedKey } = await deriveSharedKey(myPrivateKey, ephemeralPublic);
+      // If present in the message, cross-check against stored contact key
+      const contact = await getContact(encrypted.senderId);
+      if (contact?.publicKey) {
+        // Prefer the stored (trusted) key if we have it
+        signingPubKeyBase64 = contact.publicKey;
+      }
 
-    // Decrypt
-    const plaintext = await decrypt(sharedKey, encrypted.ciphertext, encrypted.nonce);
+      if (signingPubKeyBase64) {
+        const signingPubKey = await importECDSAPublicKey(signingPubKeyBase64);
+        signatureValid = await verify(signingPubKey, encrypted.ciphertext, encrypted.signature);
+      }
+    } catch (err) {
+      console.warn('[Messaging] Signature verification error:', err);
+    }
+
+    if (!signatureValid) {
+      console.warn(
+        `[Messaging] ⚠ Signature verification FAILED for message ${encrypted.id} from ${encrypted.senderId}. ` +
+        'Message may be tampered or forged.'
+      );
+      // We still decrypt but flag it — in production you might reject entirely
+    }
+
+    // ── 2. Decrypt content ─────────────────────────────────
+    let plaintext: string;
+
+    if (encrypted.ratchetHeader) {
+      // Double Ratchet message
+      let ratchetState = this.ratchetStates.get(encrypted.senderId);
+      if (!ratchetState) {
+        // Initialize as responder
+        const myKeyPair = await this.getEncryptionKeyPair();
+        const { key: sharedSecret } = await deriveSharedKey(
+          myKeyPair.privateKey,
+          await importECDHPublicKey(encrypted.ephemeralPublicKey)
+        );
+        ratchetState = await initRatchetAsResponder(sharedSecret, myKeyPair);
+      }
+
+      try {
+        const result = await ratchetDecrypt(
+          ratchetState,
+          encrypted.ratchetHeader,
+          encrypted.ciphertext,
+          encrypted.nonce
+        );
+        this.ratchetStates.set(encrypted.senderId, result.state);
+        plaintext = result.plaintext;
+      } catch (err) {
+        console.warn('[Messaging] Ratchet decrypt failed, trying ephemeral ECDH fallback:', err);
+        plaintext = await this.ephemeralDecrypt(encrypted);
+      }
+    } else {
+      // Ephemeral ECDH message (first message or legacy)
+      plaintext = await this.ephemeralDecrypt(encrypted);
+
+      // Initialize ratchet as responder for future messages
+      try {
+        const myKeyPair = await this.getEncryptionKeyPair();
+        const ephPubKey = await importECDHPublicKey(encrypted.ephemeralPublicKey);
+        const { key: sharedSecret } = await deriveSharedKey(myKeyPair.privateKey, ephPubKey);
+        const state = await initRatchetAsResponder(sharedSecret, myKeyPair);
+        this.ratchetStates.set(encrypted.senderId, state);
+      } catch (err) {
+        console.warn('[Messaging] Ratchet responder init failed:', err);
+      }
+    }
+
     const parsed = JSON.parse(plaintext);
 
     return {
@@ -259,7 +456,34 @@ export class MessagingEngine {
       content: parsed.content,
       timestamp: parsed.timestamp || encrypted.timestamp,
       status: 'delivered',
+      metadata: signatureValid ? { verified: true } : { verified: false },
     };
+  }
+
+  /** Decrypt using ephemeral ECDH (non-ratchet path) */
+  private async ephemeralDecrypt(encrypted: EncryptedMessage): Promise<string> {
+    const myPrivateKey = await importECDHPrivateKey(this.encryptionPrivateKey);
+    const ephemeralPublic = await importECDHPublicKey(encrypted.ephemeralPublicKey);
+    const { key: sharedKey } = await deriveSharedKey(myPrivateKey, ephemeralPublic);
+    return decrypt(sharedKey, encrypted.ciphertext, encrypted.nonce);
+  }
+
+  /** Get our ECDH key pair for ratchet initialization */
+  private async getEncryptionKeyPair(): Promise<CryptoKeyPair> {
+    const privateKey = await importECDHPrivateKey(this.encryptionPrivateKey);
+    // Derive public key from private JWK
+    const jwk = JSON.parse(atob(this.encryptionPrivateKey));
+    const pubJwk = { ...jwk };
+    delete pubJwk.d;
+    pubJwk.key_ops = [];
+    const publicKey = await crypto.subtle.importKey(
+      'jwk',
+      pubJwk,
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      []
+    );
+    return { privateKey, publicKey } as CryptoKeyPair;
   }
 
   // ─── Receipts & Indicators ──────────────────────────────

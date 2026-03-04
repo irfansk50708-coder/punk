@@ -1,10 +1,18 @@
 // ============================================================
-// Chat Window - Message display and input
+// Chat Window – MUI + Lucide
 // ============================================================
 
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
+import Avatar from '@mui/material/Avatar';
+import Tooltip from '@mui/material/Tooltip';
+import Paper from '@mui/material/Paper';
+import Badge from '@mui/material/Badge';
+import Chip from '@mui/material/Chip';
 import {
   Send,
   Phone,
@@ -20,7 +28,7 @@ import {
   AlertCircle,
   Lock,
 } from 'lucide-react';
-import { cn, formatTime, formatDate, generateColor } from '@/lib/utils';
+import { formatTime, formatDate, generateColor } from '@/lib/utils';
 import type { Message, Contact, Conversation, Identity } from '@/lib/types';
 
 interface ChatWindowProps {
@@ -59,11 +67,9 @@ export default function ChatWindow({
   const isOnline = connectedPeers.includes(peerId);
   const displayName = contact?.displayName || peerId.slice(0, 12) + '...';
 
-  // Group messages by date
   const groupedMessages = useMemo(() => {
     const groups: { date: string; messages: Message[] }[] = [];
     let currentDate = '';
-
     for (const msg of messages) {
       const date = formatDate(msg.timestamp);
       if (date !== currentDate) {
@@ -73,16 +79,13 @@ export default function ChatWindow({
         groups[groups.length - 1].messages.push(msg);
       }
     }
-
     return groups;
   }, [messages]);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Focus input
   useEffect(() => {
     inputRef.current?.focus();
   }, [conversation.id]);
@@ -90,25 +93,16 @@ export default function ChatWindow({
   const handleSend = useCallback(() => {
     const content = input.trim();
     if (!content) return;
-
     onSendMessage(content);
     setInput('');
     onTyping(false);
-
-    // Reset textarea height
-    if (inputRef.current) {
-      inputRef.current.style.height = 'auto';
-    }
+    if (inputRef.current) inputRef.current.style.height = 'auto';
   }, [input, onSendMessage, onTyping]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-
-    // Auto-resize textarea
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-
-    // Typing indicator
     onTyping(true);
     clearTimeout(typingTimerRef.current);
     typingTimerRef.current = setTimeout(() => onTyping(false), 2000);
@@ -123,177 +117,156 @@ export default function ChatWindow({
 
   const getStatusIcon = (status: Message['status']) => {
     switch (status) {
-      case 'sending':
-        return <Clock className="w-3 h-3 text-gray-600" />;
-      case 'sent':
-        return <Check className="w-3 h-3 text-gray-500" />;
-      case 'delivered':
-        return <CheckCheck className="w-3 h-3 text-gray-500" />;
-      case 'read':
-        return <CheckCheck className="w-3 h-3 text-emerald-400" />;
-      case 'failed':
-        return <AlertCircle className="w-3 h-3 text-red-400" />;
-      default:
-        return null;
+      case 'sending':  return <Clock size={12} color="#4b5563" />;
+      case 'sent':     return <Check size={12} color="#6b7280" />;
+      case 'delivered': return <CheckCheck size={12} color="#6b7280" />;
+      case 'read':     return <CheckCheck size={12} color="#10b981" />;
+      case 'failed':   return <AlertCircle size={12} color="#ef4444" />;
+      default:         return null;
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-950">
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#030712' }}>
       {/* Header */}
-      <div className="flex items-center gap-3 p-3 px-4 border-b border-gray-800/50 bg-gray-950/90 backdrop-blur-sm">
-        <button
-          onClick={onBack}
-          className="md:hidden p-1 text-gray-400 hover:text-white"
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          px: 2,
+          py: 1.5,
+          borderBottom: '1px solid rgba(55,65,81,0.3)',
+          bgcolor: 'rgba(3,7,18,0.9)',
+          backdropFilter: 'blur(12px)',
+        }}
+      >
+        <IconButton onClick={onBack} size="small" sx={{ display: { xs: 'flex', md: 'none' }, color: '#9ca3af' }}>
+          <ArrowLeft size={20} />
+        </IconButton>
+
+        <Badge
+          overlap="circular"
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          variant="dot"
+          invisible={!isOnline}
+          sx={{ '& .MuiBadge-badge': { bgcolor: '#10b981', border: '2px solid #030712', width: 10, height: 10, borderRadius: '50%' } }}
         >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-
-        <div className="relative">
-          <div
-            className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm"
-            style={{ backgroundColor: generateColor(peerId) }}
-          >
+          <Avatar sx={{ width: 40, height: 40, bgcolor: generateColor(peerId), fontWeight: 600, fontSize: '0.9rem' }}>
             {displayName[0]?.toUpperCase()}
-          </div>
-          {isOnline && (
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-gray-950" />
-          )}
-        </div>
+          </Avatar>
+        </Badge>
 
-        <div className="flex-1 min-w-0">
-          <h3 className="text-white font-medium text-sm truncate">
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: '#fff', fontSize: '0.85rem' }} noWrap>
             {displayName}
-          </h3>
-          <p className="text-xs text-gray-500">
+          </Typography>
+          <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.7rem' }}>
             {isTyping ? (
-              <span className="text-emerald-400">typing...</span>
-            ) : isOnline ? (
-              'online'
-            ) : contact?.lastSeen ? (
-              `last seen ${formatTime(contact.lastSeen)}`
-            ) : (
-              'offline'
-            )}
-          </p>
-        </div>
+              <Box component="span" sx={{ color: '#10b981' }}>typing...</Box>
+            ) : isOnline ? 'online' : contact?.lastSeen ? `last seen ${formatTime(contact.lastSeen)}` : 'offline'}
+          </Typography>
+        </Box>
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={onStartVoiceCall}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            title="Voice Call"
-          >
-            <Phone className="w-5 h-5" />
-          </button>
-          <button
-            onClick={onStartVideoCall}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            title="Video Call"
-          >
-            <Video className="w-5 h-5" />
-          </button>
-          <button
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            title="More"
-          >
-            <MoreVertical className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title="Voice Call" arrow>
+            <IconButton onClick={onStartVoiceCall} sx={{ color: '#9ca3af' }}>
+              <Phone size={20} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Video Call" arrow>
+            <IconButton onClick={onStartVideoCall} sx={{ color: '#9ca3af' }}>
+              <Video size={20} />
+            </IconButton>
+          </Tooltip>
+          <IconButton sx={{ color: '#9ca3af' }}>
+            <MoreVertical size={20} />
+          </IconButton>
+        </Box>
+      </Box>
 
       {/* Encryption Banner */}
-      <div className="flex items-center justify-center gap-2 py-2 text-xs text-gray-600 bg-gray-900/30">
-        <Lock className="w-3 h-3" />
-        <span>Messages are end-to-end encrypted. No one outside of this chat can read them.</span>
-      </div>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, py: 0.8, bgcolor: 'rgba(17,24,39,0.3)' }}>
+        <Lock size={11} color="#4b5563" />
+        <Typography variant="caption" sx={{ color: '#4b5563', fontSize: '0.65rem' }}>
+          Messages are end-to-end encrypted. No one outside of this chat can read them.
+        </Typography>
+      </Box>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1">
+      <Box sx={{ flex: 1, overflowY: 'auto', px: 2, py: 1 }}>
         {groupedMessages.map((group) => (
-          <div key={group.date}>
-            {/* Date Separator */}
-            <div className="flex items-center justify-center my-4">
-              <span className="px-3 py-1 bg-gray-800/50 rounded-full text-xs text-gray-500">
-                {group.date}
-              </span>
-            </div>
+          <Box key={group.date}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
+              <Chip
+                label={group.date}
+                size="small"
+                sx={{ bgcolor: 'rgba(31,41,55,0.5)', color: '#6b7280', fontSize: '0.65rem', height: 24 }}
+              />
+            </Box>
 
-            {/* Messages */}
-            {group.messages.map((msg, idx) => {
+            {group.messages.map((msg) => {
               const isMine = msg.senderId === identity.id;
-              const showAvatar =
-                !isMine &&
-                (idx === 0 ||
-                  group.messages[idx - 1]?.senderId !== msg.senderId);
-
               return (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    'flex gap-2 mb-1',
-                    isMine ? 'justify-end' : 'justify-start'
-                  )}
-                >
-                  {/* Message Bubble */}
-                  <div
-                    className={cn(
-                      'max-w-[70%] rounded-2xl px-4 py-2 shadow-sm',
-                      isMine
-                        ? 'bg-emerald-600 text-white rounded-br-md'
-                        : 'bg-gray-800 text-gray-100 rounded-bl-md'
-                    )}
+                <Box key={msg.id} sx={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start', mb: 0.5 }}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      maxWidth: '70%',
+                      px: 2,
+                      py: 1,
+                      borderRadius: isMine ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                      bgcolor: isMine ? '#059669' : 'rgba(31,41,55,0.8)',
+                      border: isMine ? 'none' : '1px solid rgba(55,65,81,0.3)',
+                    }}
                   >
-                    <p className="text-sm whitespace-pre-wrap break-words">
+                    <Typography variant="body2" sx={{ fontSize: '0.85rem', color: isMine ? '#fff' : '#e5e7eb', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                       {msg.content}
-                    </p>
-                    <div
-                      className={cn(
-                        'flex items-center gap-1 mt-1',
-                        isMine ? 'justify-end' : 'justify-start'
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'text-[10px]',
-                          isMine ? 'text-emerald-200' : 'text-gray-500'
-                        )}
-                      >
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5, justifyContent: isMine ? 'flex-end' : 'flex-start' }}>
+                      <Typography sx={{ fontSize: '0.6rem', color: isMine ? 'rgba(255,255,255,0.6)' : '#6b7280' }}>
                         {formatTime(msg.timestamp)}
-                      </span>
+                      </Typography>
                       {isMine && getStatusIcon(msg.status)}
-                    </div>
-                  </div>
-                </div>
+                    </Box>
+                  </Paper>
+                </Box>
               );
             })}
-          </div>
+          </Box>
         ))}
 
         {/* Typing Indicator */}
         {isTyping && (
-          <div className="flex justify-start mb-1">
-            <div className="bg-gray-800 rounded-2xl rounded-bl-md px-4 py-3">
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-            </div>
-          </div>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 0.5 }}>
+            <Paper elevation={0} sx={{ px: 2, py: 1.5, borderRadius: '16px 16px 16px 4px', bgcolor: 'rgba(31,41,55,0.8)', border: '1px solid rgba(55,65,81,0.3)' }}>
+              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                {[0, 150, 300].map((delay) => (
+                  <Box key={delay} sx={{
+                    width: 8, height: 8, borderRadius: '50%', bgcolor: '#6b7280',
+                    animation: 'bounce 1.4s infinite ease-in-out',
+                    animationDelay: `${delay}ms`,
+                    '@keyframes bounce': {
+                      '0%, 80%, 100%': { transform: 'scale(0.6)' },
+                      '40%': { transform: 'scale(1)' },
+                    },
+                  }} />
+                ))}
+              </Box>
+            </Paper>
+          </Box>
         )}
-
         <div ref={messagesEndRef} />
-      </div>
+      </Box>
 
       {/* Input Area */}
-      <div className="p-3 border-t border-gray-800/50 bg-gray-950/90 backdrop-blur-sm">
-        <div className="flex items-end gap-2">
-          <button className="p-2 text-gray-500 hover:text-gray-300 transition-colors shrink-0">
-            <Paperclip className="w-5 h-5" />
-          </button>
+      <Box sx={{ px: 2, py: 1.5, borderTop: '1px solid rgba(55,65,81,0.3)', bgcolor: 'rgba(3,7,18,0.9)', backdropFilter: 'blur(12px)' }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1 }}>
+          <IconButton size="small" sx={{ color: '#6b7280', mb: 0.5 }}>
+            <Paperclip size={20} />
+          </IconButton>
 
-          <div className="flex-1 relative">
+          <Box sx={{ flex: 1 }}>
             <textarea
               ref={inputRef}
               value={input}
@@ -301,29 +274,53 @@ export default function ChatWindow({
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               rows={1}
-              className="w-full px-4 py-2.5 bg-gray-900/50 border border-gray-800 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-gray-700 resize-none transition overflow-hidden"
-              style={{ minHeight: '42px', maxHeight: '120px' }}
+              style={{
+                width: '100%',
+                padding: '10px 16px',
+                backgroundColor: 'rgba(17,24,39,0.5)',
+                border: '1px solid rgba(55,65,81,0.5)',
+                borderRadius: 12,
+                color: '#fff',
+                fontSize: '0.85rem',
+                resize: 'none',
+                outline: 'none',
+                minHeight: 42,
+                maxHeight: 120,
+                fontFamily: 'inherit',
+                overflow: 'hidden',
+                transition: 'border-color 0.2s',
+              }}
+              onFocus={(e) => (e.target.style.borderColor = '#10b981')}
+              onBlur={(e) => (e.target.style.borderColor = 'rgba(55,65,81,0.5)')}
             />
-          </div>
+          </Box>
 
-          <button className="p-2 text-gray-500 hover:text-gray-300 transition-colors shrink-0">
-            <Smile className="w-5 h-5" />
-          </button>
+          <IconButton size="small" sx={{ color: '#6b7280', mb: 0.5 }}>
+            <Smile size={20} />
+          </IconButton>
 
-          <button
-            onClick={handleSend}
-            disabled={!input.trim()}
-            className={cn(
-              'p-2.5 rounded-xl transition-all shrink-0',
-              input.trim()
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20'
-                : 'bg-gray-800 text-gray-600 cursor-not-allowed'
-            )}
-          >
-            <Send className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-    </div>
+          <Tooltip title="Send" arrow>
+            <span>
+              <IconButton
+                onClick={handleSend}
+                disabled={!input.trim()}
+                sx={{
+                  mb: 0.5,
+                  width: 40,
+                  height: 40,
+                  bgcolor: input.trim() ? '#059669' : 'rgba(31,41,55,0.5)',
+                  color: input.trim() ? '#fff' : '#4b5563',
+                  boxShadow: input.trim() ? '0 4px 12px rgba(16,185,129,0.3)' : 'none',
+                  '&:hover': { bgcolor: input.trim() ? '#047857' : 'rgba(31,41,55,0.5)' },
+                  transition: 'all 0.2s',
+                }}
+              >
+                <Send size={18} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
+      </Box>
+    </Box>
   );
 }

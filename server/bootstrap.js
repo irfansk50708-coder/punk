@@ -15,6 +15,20 @@ const HEARTBEAT_INTERVAL = 30000;
 // ─── Peer Registry ───────────────────────────────────────────
 const peers = new Map(); // peerId -> { ws, publicKey, lastSeen, isRelay }
 
+// ─── Short Code Registry ─────────────────────────────────────
+const CODE_TTL = 10 * 60 * 1000; // 10 minutes
+const codes = new Map(); // code -> { id, displayName, publicKey, encryptionPublicKey, createdAt }
+
+function generateCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid confusion
+  let code;
+  do {
+    code = '';
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  } while (codes.has(code));
+  return code;
+}
+
 // ─── HTTP Server ─────────────────────────────────────────────
 const server = http.createServer((req, res) => {
   // Health check endpoint
@@ -39,7 +53,9 @@ const server = http.createServer((req, res) => {
       'peer-discovery',
       'signal-relay',
       'nat-traversal',
+      'short-codes',
     ],
+    activeCodes: codes.size,
   }));
 });
 
@@ -154,6 +170,50 @@ function handleMessage(ws, message) {
       break;
     }
 
+    case 'register-code': {
+      const payload = message.payload || {};
+      const code = generateCode();
+      codes.set(code, {
+        id: payload.id,
+        displayName: payload.displayName,
+        publicKey: payload.publicKey,
+        encryptionPublicKey: payload.encryptionPublicKey,
+        createdAt: Date.now(),
+      });
+      console.log(`[Bootstrap] Code registered: ${code} for ${(payload.id || '').slice(0, 12)}...`);
+      send(ws, {
+        type: 'code-registered',
+        from: 'bootstrap',
+        to: message.from,
+        payload: { code },
+        timestamp: Date.now(),
+      });
+      break;
+    }
+
+    case 'lookup-code': {
+      const { code: lookupCode } = message.payload || {};
+      const entry = codes.get((lookupCode || '').toUpperCase());
+      if (entry && (Date.now() - entry.createdAt < CODE_TTL)) {
+        send(ws, {
+          type: 'code-result',
+          from: 'bootstrap',
+          to: message.from,
+          payload: { found: true, ...entry },
+          timestamp: Date.now(),
+        });
+      } else {
+        send(ws, {
+          type: 'code-result',
+          from: 'bootstrap',
+          to: message.from,
+          payload: { found: false },
+          timestamp: Date.now(),
+        });
+      }
+      break;
+    }
+
     // Relay signaling messages to target peer
     case 'offer':
     case 'answer':
@@ -243,6 +303,13 @@ const heartbeat = setInterval(() => {
     if (now - peer.lastSeen > PEER_TTL) {
       peers.delete(id);
       broadcastPeerLeft(id);
+    }
+  }
+
+  // Cleanup expired codes
+  for (const [code, entry] of codes) {
+    if (now - entry.createdAt > CODE_TTL) {
+      codes.delete(code);
     }
   }
 }, HEARTBEAT_INTERVAL);
